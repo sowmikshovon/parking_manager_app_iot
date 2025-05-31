@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'login_page.dart';
+import 'list_spot_page.dart';
+import 'listing_history_page.dart';
+import 'booking_history_page.dart';
+import 'profile_page.dart';
 
 class BookSpotPage extends StatefulWidget {
   const BookSpotPage({super.key});
@@ -16,6 +21,24 @@ class _BookSpotPageState extends State<BookSpotPage> {
   String? _selectedSpotId;
   LatLng? _selectedLatLng;
   String? _selectedAddress;
+
+  Future<String> _getUserName(User user) async {
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (userDoc.exists && userDoc.data() != null) {
+        return userDoc.data()!['name'] ?? 'User';
+      }
+    } catch (e) {
+      // Handle error appropriately
+    }
+    return 'User';
+  }
 
   Future<void> _bookSpot(String spotId, String address) async {
     setState(() {
@@ -66,8 +89,151 @@ class _BookSpotPageState extends State<BookSpotPage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Book a Parking Spot')),
+      appBar: AppBar(
+        title: const Text('Book a Parking Spot'),
+        actions: [
+          // Profile Button
+          IconButton(
+            icon: const Icon(Icons.account_circle, color: Colors.white),
+            tooltip: 'Profile',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
+          ),
+          // Logout Button
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Logout',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.directions_car,
+                      color: Colors.teal,
+                      size: 35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Parking Manager',
+                    style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),
+                  const SizedBox(height: 5),
+                  if (user != null)
+                    FutureBuilder<String>(
+                      future: _getUserName(user),
+                      builder: (context, snapshot) {
+                        String name = snapshot.data ?? 'User';
+                        return Text(
+                          name,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.search_outlined),
+              title: const Text('Book a Spot'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_location_alt_outlined),
+              title: const Text('List a New Spot'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ListSpotPage()),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.history_edu_outlined),
+              title: const Text('My Listed Spots'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ListingHistoryPage(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('My Booking History'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const BookingHistoryPage(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.account_circle),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () async {
+                Navigator.pop(context); // Close drawer
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -187,9 +353,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                 onPressed: _isLoading
                                     ? null
                                     : () => _bookSpot(
-                                        _selectedSpotId!,
-                                        _selectedAddress ?? '',
-                                      ),
+                                          _selectedSpotId!,
+                                          _selectedAddress ?? '',
+                                        ),
                                 child: _isLoading
                                     ? const SizedBox(
                                         width: 20,
@@ -198,8 +364,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                           strokeWidth: 2,
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                                Colors.white,
-                                              ),
+                                            Colors.white,
+                                          ),
                                         ),
                                       )
                                     : const Text('Confirm Booking'),

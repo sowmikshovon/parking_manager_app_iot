@@ -255,17 +255,17 @@ class _ProfilePageState extends State<ProfilePage> {
                             backgroundImage: _imageFile != null
                                 ? FileImage(_imageFile!)
                                 : _profileImageUrl != null
-                                ? NetworkImage(_profileImageUrl!)
-                                      as ImageProvider
-                                : null,
+                                    ? NetworkImage(_profileImageUrl!)
+                                        as ImageProvider
+                                    : null,
                             child:
                                 (_imageFile == null && _profileImageUrl == null)
-                                ? const Icon(
-                                    Icons.person,
-                                    size: 80,
-                                    color: Colors.grey,
-                                  )
-                                : null,
+                                    ? const Icon(
+                                        Icons.person,
+                                        size: 80,
+                                        color: Colors.grey,
+                                      )
+                                    : null,
                           ),
                           Positioned(
                             bottom: 0,

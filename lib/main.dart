@@ -7,75 +7,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'firebase_options.dart';
 import 'qr_pdf_util.dart';
 
-import './pages/profile_page.dart';
 //import './pages/qr_code_page.dart';
 //import './pages/login_page.dart';
 //import './pages/listing_history_page.dart';
 
 // QrCodePage widget displays a QR code for a given parking spot
-
-class QrCodePage extends StatelessWidget {
-  final String spotId;
-  final String address;
-
-  const QrCodePage({super.key, required this.spotId, required this.address});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Spot QR Code')),
-      body: Center(
-        child: Card(
-          margin: const EdgeInsets.all(24),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Parking Spot QR Code',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                QrImageView(
-                  data: spotId,
-                  version: QrVersions.auto,
-                  size: 200.0,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Spot ID: $spotId',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  address,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('Download QR as PDF'),
-                  onPressed: () async {
-                    await saveQrCodeAsPdf(
-                      context: context,
-                      spotId: spotId,
-                      address: address,
-                      qrData: spotId,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -167,137 +103,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/*class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-
-  @override
-  State<LoginPage> createState() => _LoginPageState();
-}
-
-class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-  String? _error;
-
-  Future<void> _signIn() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomePage()),
-          (route) => false,
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _error = e.message ?? "An unknown error occurred.";
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Welcome Back!',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email_outlined),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 16),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10.0),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red, fontSize: 14),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _signIn,
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Text('Login'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const SignUpPage(),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      'Don\'t have an account? Sign up',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}*/
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -309,8 +114,8 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
   String? _error;
+  bool _obscurePassword = true;
 
   Future<void> _signIn() async {
     setState(() {
@@ -376,11 +181,9 @@ class _LoginPageState extends State<LoginPage> {
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility),
                         onPressed: () {
                           setState(() {
                             _obscurePassword = !_obscurePassword;
@@ -442,224 +245,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-/*class SignUpPage extends StatefulWidget {
-  const SignUpPage({super.key});
-
-  @override
-  State<SignUpPage> createState() => _SignUpPageState();
-}
-
-class _SignUpPageState extends State<SignUpPage> {
-  final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _lastNameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-  String? _error;
-  String? _firstNameError;
-  String? _lastNameError;
-  String? _emailError;
-  String? _passwordError;
-
-  void _validateFirstName(String value) {
-    setState(() {
-      if (value.isEmpty) {
-        _firstNameError = 'First name cannot be empty';
-      } else {
-        _firstNameError = null;
-      }
-    });
-  }
-
-  void _validateLastName(String value) {
-    setState(() {
-      if (value.isEmpty) {
-        _lastNameError = 'Last name cannot be empty';
-      } else {
-        _lastNameError = null;
-      }
-    });
-  }
-
-  void _validateEmail(String value) {
-    setState(() {
-      if (value.isEmpty) {
-        _emailError = 'Email cannot be empty';
-      } else if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-        _emailError = 'Enter a valid email address';
-      } else {
-        _emailError = null;
-      }
-    });
-  }
-
-  void _validatePassword(String value) {
-    setState(() {
-      if (value.isEmpty) {
-        _passwordError = 'Password cannot be empty';
-      } else if (value.length < 6) {
-        _passwordError = 'Password must be at least 6 characters';
-      } else {
-        _passwordError = null;
-      }
-    });
-  }
-
-  Future<void> _signUp() async {
-    _validateFirstName(_firstNameController.text);
-    _validateLastName(_lastNameController.text);
-    _validateEmail(_emailController.text);
-    _validatePassword(_passwordController.text);
-
-    if (_firstNameError != null ||
-        _lastNameError != null ||
-        _emailError != null ||
-        _passwordError != null) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      User? user = userCredential.user;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'name':
-              '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-          'email': user.email,
-        });
-      }
-      if (mounted) {
-        Navigator.pop(context); // Go back to LoginPage
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sign up successful! Please log in.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        if (e.code == 'email-already-in-use') {
-          _error = 'This email address is already in use.';
-        } else {
-          _error = e.message ?? 'An unknown error occurred.';
-        }
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign Up')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Create Account',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _firstNameController,
-                    decoration: InputDecoration(
-                      labelText: 'First Name',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      errorText: _firstNameError,
-                    ),
-                    onChanged: _validateFirstName,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _lastNameController,
-                    decoration: InputDecoration(
-                      labelText: 'Last Name',
-                      prefixIcon: const Icon(Icons.person),
-                      errorText: _lastNameError,
-                    ),
-                    onChanged: _validateLastName,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _emailController,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      errorText: _emailError,
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    onChanged: _validateEmail,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      errorText: _passwordError,
-                    ),
-                    obscureText: true,
-                    onChanged: _validatePassword,
-                  ),
-                  const SizedBox(height: 16),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10.0),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red, fontSize: 14),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _signUp,
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Text('Sign Up'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}*/
-
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -673,12 +258,12 @@ class _SignUpPageState extends State<SignUpPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
   String? _error;
   String? _firstNameError;
   String? _lastNameError;
   String? _emailError;
   String? _passwordError;
+  bool _obscurePassword = true;
 
   void _validateFirstName(String value) {
     setState(() {
@@ -840,11 +425,9 @@ class _SignUpPageState extends State<SignUpPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       errorText: _passwordError,
                       suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility),
                         onPressed: () {
                           setState(() {
                             _obscurePassword = !_obscurePassword;
@@ -1136,177 +719,7 @@ class BookingHistoryPage extends StatelessWidget {
   }
 }
 
-/*class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  Future<String> _getUserName(User user) async {
-    if (user.displayName != null && user.displayName!.isNotEmpty) {
-      return user.displayName!;
-    }
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (userDoc.exists && userDoc.data() != null) {
-        return userDoc.data()!['name'] ?? 'User';
-      }
-    } catch (e) {
-      // Log error or handle appropriately
-      // print("Error fetching user name: $e");
-    }
-    return 'User';
-  }
-
-  Widget _buildHomeButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-    Color? backgroundColor,
-  }) {
-    return ElevatedButton.icon(
-      icon: Icon(icon, size: 24),
-      label: Text(label),
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor:
-            backgroundColor ?? Theme.of(context).colorScheme.primary,
-        minimumSize: const Size(double.infinity, 60),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        alignment: Alignment.centerLeft,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Parking Manager'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (user != null)
-                FutureBuilder<String>(
-                  future: _getUserName(user),
-                  builder: (context, snapshot) {
-                    String welcomeName = 'User';
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      welcomeName = 'Loading...';
-                    } else if (snapshot.hasData) {
-                      welcomeName = snapshot.data!;
-                    } else if (snapshot.hasError) {
-                      welcomeName = 'User (Error)';
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24.0),
-                      child: Text(
-                        'Welcome, $welcomeName!',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.headlineSmall?.copyWith(fontSize: 26),
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  },
-                ),
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.search_outlined,
-                          label: 'Book a Parking Spot',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const BookSpotPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.add_location_alt_outlined,
-                          label: 'List a New Spot',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const ListSpotPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.history_edu_outlined,
-                          label: 'My Listed Spots',
-                          backgroundColor: Colors.blueGrey[700],
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ListingHistoryPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.receipt_long_outlined,
-                          label: 'My Booking History',
-                          backgroundColor: Colors.blueGrey[700],
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const BookingHistoryPage(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}*/
-
+/*
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -1324,7 +737,6 @@ class HomePage extends StatelessWidget {
       }
     } catch (e) {
       // Log error or handle appropriately
-      // print("Error fetching user name: $e");
     }
     return 'User';
   }
@@ -1359,17 +771,6 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Parking Manager'),
         actions: [
-          // Profile Button
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.white),
-            tooltip: 'Profile',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const ProfilePage()),
-              );
-            },
-          ),
-          // Logout Button
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             tooltip: 'Logout',
@@ -1384,123 +785,6 @@ class HomePage extends StatelessWidget {
             },
           ),
         ],
-      ),
-      // Add a drawer for navigation options
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      Icons.directions_car,
-                      color: Colors.teal,
-                      size: 35,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Parking Manager',
-                    style: TextStyle(color: Colors.white, fontSize: 20),
-                  ),
-                  const SizedBox(height: 5),
-                  if (user != null)
-                    FutureBuilder<String>(
-                      future: _getUserName(user),
-                      builder: (context, snapshot) {
-                        String name = snapshot.data ?? 'User';
-                        return Text(
-                          name,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.search_outlined),
-              title: const Text('Book a Spot'),
-              onTap: () {
-                Navigator.pop(context); // Close drawer
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const BookSpotPage()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.add_location_alt_outlined),
-              title: const Text('List a New Spot'),
-              onTap: () {
-                Navigator.pop(context); // Close drawer
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const ListSpotPage()),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.history_edu_outlined),
-              title: const Text('My Listed Spots'),
-              onTap: () {
-                Navigator.pop(context); // Close drawer
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const ListingHistoryPage(),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.receipt_long_outlined),
-              title: const Text('My Booking History'),
-              onTap: () {
-                Navigator.pop(context); // Close drawer
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const BookingHistoryPage(),
-                  ),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.account_circle),
-              title: const Text('Profile'),
-              onTap: () {
-                Navigator.pop(context); // Close drawer
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const ProfilePage()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () async {
-                Navigator.pop(context); // Close drawer
-                await FirebaseAuth.instance.signOut();
-                if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
-                }
-              },
-            ),
-          ],
-        ),
       ),
       body: SafeArea(
         child: Padding(
@@ -1524,9 +808,10 @@ class HomePage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 24.0),
                       child: Text(
                         'Welcome, $welcomeName!',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.headlineSmall?.copyWith(fontSize: 26),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontSize: 26),
                         textAlign: TextAlign.center,
                       ),
                     );
@@ -1550,114 +835,7 @@ class HomePage extends StatelessWidget {
                             );
                           },
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class HomePageAlt extends StatelessWidget {
-  const HomePageAlt({super.key});
-
-  Future<String> _getUserName(User user) async {
-    // Try Firebase Auth display name first
-    if (user.displayName != null && user.displayName!.isNotEmpty) {
-      return user.displayName!;
-    }
-    // Fallback to Firestore
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (userDoc.exists && userDoc.data() != null) {
-        return userDoc.data()!['name'] ?? 'User';
-      }
-    } catch (e) {
-      // Log error or handle
-    }
-    return 'User'; // Default if not found
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Parking Manager Home'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      // Removed stray parenthesis and semicolon here
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (user != null)
-                FutureBuilder<String>(
-                  future: _getUserName(user),
-                  builder: (context, snapshot) {
-                    String welcomeName = 'User';
-                    if (snapshot.connectionState == ConnectionState.done &&
-                        snapshot.hasData) {
-                      welcomeName = snapshot.data!;
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24.0),
-                      child: Text(
-                        'Welcome, $welcomeName!',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(color: Colors.teal[800]),
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  },
-                ),
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    // Added for smaller screens
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.search,
-                          label: 'Book a Parking Spot',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const BookSpotPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                         _buildHomeButton(
                           context,
                           icon: Icons.add_location_alt_outlined,
@@ -1670,11 +848,12 @@ class HomePageAlt extends StatelessWidget {
                             );
                           },
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                         _buildHomeButton(
                           context,
                           icon: Icons.history_edu_outlined,
                           label: 'My Listed Spots',
+                          backgroundColor: Colors.blueGrey[700],
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -1684,11 +863,12 @@ class HomePageAlt extends StatelessWidget {
                             );
                           },
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                         _buildHomeButton(
                           context,
                           icon: Icons.receipt_long_outlined,
                           label: 'My Booking History',
+                          backgroundColor: Colors.blueGrey[700],
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -1709,26 +889,8 @@ class HomePageAlt extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildHomeButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return ElevatedButton.icon(
-      icon: Icon(icon, size: 24),
-      label: Text(label),
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 60), // Make buttons wider
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-      ),
-    );
-  }
 }
-
+*/
 class ListSpotPage extends StatefulWidget {
   const ListSpotPage({super.key});
 
@@ -1941,6 +1103,254 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                   ),
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
+  Future<String> _getUserName(User user) async {
+    // Try Firebase Auth display name first
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    // Fallback to Firestore
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (userDoc.exists && userDoc.data() != null) {
+        return userDoc.data()!['name'] ?? 'User';
+      }
+    } catch (e) {
+      // Log error or handle
+    }
+    return 'User'; // Default if not found
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Parking Manager Home'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      // Removed stray parenthesis and semicolon here
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (user != null)
+                FutureBuilder<String>(
+                  future: _getUserName(user),
+                  builder: (context, snapshot) {
+                    String welcomeName = 'User';
+                    if (snapshot.connectionState == ConnectionState.done &&
+                        snapshot.hasData) {
+                      welcomeName = snapshot.data!;
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24.0),
+                      child: Text(
+                        'Welcome, $welcomeName!',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(color: Colors.teal[800]),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  },
+                ),
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    // Added for smaller screens
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildHomeButton(
+                          context,
+                          icon: Icons.search,
+                          label: 'Book a Parking Spot',
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const BookSpotPage(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildHomeButton(
+                          context,
+                          icon: Icons.add_location_alt_outlined,
+                          label: 'List a New Spot',
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const ListSpotPage(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildHomeButton(
+                          context,
+                          icon: Icons.history_edu_outlined,
+                          label: 'My Listed Spots',
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ListingHistoryPage(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildHomeButton(
+                          context,
+                          icon: Icons.receipt_long_outlined,
+                          label: 'My Booking History',
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const BookingHistoryPage(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeButton(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      icon: Icon(icon, size: 24),
+      label: Text(label),
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 60), // Make buttons wider
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+}
+
+// QrCodePage widget displays a QR code for a given parking spot
+
+class QrCodePage extends StatelessWidget {
+  final String spotId;
+  final String address;
+
+  const QrCodePage({super.key, required this.spotId, required this.address});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Spot QR Code')),
+      body: Center(
+        child: Card(
+          margin: const EdgeInsets.all(24),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Parking Spot QR Code',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                QrImageView(
+                  data: spotId,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Spot ID: $spotId',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  address,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.picture_as_pdf),
+                  label: const Text('Download QR as PDF'),
+                  onPressed: () async {
+                    await saveQrCodeAsPdf(
+                      context: context,
+                      spotId: spotId,
+                      address: address,
+                      qrData: spotId,
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.home),
+                  label: const Text('Return to Home'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const HomePage()),
+                      (route) => false,
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ),

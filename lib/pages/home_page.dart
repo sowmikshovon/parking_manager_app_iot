@@ -330,7 +330,9 @@ class HomePageAlt extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 24.0),
                       child: Text(
                         'Welcome, $welcomeName!',
-                        style: Theme.of(context).textTheme.headlineMedium
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
                             ?.copyWith(color: Colors.teal[800]),
                         textAlign: TextAlign.center,
                       ),

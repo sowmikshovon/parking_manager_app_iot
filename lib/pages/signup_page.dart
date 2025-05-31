@@ -9,7 +9,8 @@ class SignUpPage extends StatefulWidget {
   State<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _SignUpPageState extends State<SignUpPage> {  final TextEditingController _firstNameController = TextEditingController();
+class _SignUpPageState extends State<SignUpPage> {
+  final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -84,11 +85,11 @@ class _SignUpPageState extends State<SignUpPage> {  final TextEditingController 
     });
 
     try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
       User? user = userCredential.user;
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -173,7 +174,8 @@ class _SignUpPageState extends State<SignUpPage> {  final TextEditingController 
                     keyboardType: TextInputType.emailAddress,
                     onChanged: _validateEmail,
                   ),
-                  const SizedBox(height: 16),                  TextField(
+                  const SizedBox(height: 16),
+                  TextField(
                     controller: _passwordController,
                     decoration: InputDecoration(
                       labelText: 'Password',
@@ -181,7 +183,9 @@ class _SignUpPageState extends State<SignUpPage> {  final TextEditingController 
                       errorText: _passwordError,
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                          _obscurePassword
+                              ? Icons.visibility
+                              : Icons.visibility_off,
                         ),
                         onPressed: () {
                           setState(() {
