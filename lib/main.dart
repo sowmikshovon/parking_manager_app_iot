@@ -1151,7 +1151,7 @@ class HomePage extends StatelessWidget {
         profileImageUrl = data['profileImageUrl'] as String? ?? '';
       }
     } catch (e) {
-      print('Error getting user details from Firestore: $e');
+      // Error getting user details from Firestore
     }
 
     // If auth display name was empty and firestore didn't provide one, ensure it's 'User'
@@ -1159,7 +1159,6 @@ class HomePage extends StatelessWidget {
         (user.displayName == null || user.displayName!.isEmpty)) {
       userName = 'User';
     }
-
     return {'userName': userName, 'profileImageUrl': profileImageUrl};
   }
 
@@ -1170,17 +1169,84 @@ class HomePage extends StatelessWidget {
     required VoidCallback onPressed,
     Color? backgroundColor,
   }) {
-    return ElevatedButton.icon(
-      icon: Icon(icon, size: 24),
-      label: Text(label),
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor:
-            backgroundColor ?? Theme.of(context).colorScheme.primary,
-        minimumSize: const Size(double.infinity, 60),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        alignment: Alignment.centerLeft,
+    return Card(
+      elevation: 8,
+      shadowColor: Colors.teal.withValues(alpha: 0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              backgroundColor ?? Colors.teal.shade400,
+              backgroundColor?.withValues(alpha: 0.8) ?? Colors.teal.shade600,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onPressed,
+            splashColor: Colors.white.withValues(alpha: 0.3),
+            highlightColor: Colors.white.withValues(alpha: 0.1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 28,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1191,14 +1257,72 @@ class HomePage extends StatelessWidget {
     required String title,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-      title:
-          Text(title, style: TextStyle(color: Colors.grey[800], fontSize: 16)),
-      onTap: () {
-        Navigator.pop(context); // Close the drawer
-        onTap(); // Perform the action
-      },
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.transparent,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          splashColor:
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+          highlightColor:
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+          onTap: () {
+            Navigator.pop(context); // Close the drawer
+            onTap(); // Perform the action
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.grey[800],
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey[400],
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1208,7 +1332,33 @@ class HomePage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Parking Manager Home'),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.directions_car,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Parking Manager',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.teal.shade600,
+        foregroundColor: Colors.white,
+        elevation: 0,
         // The hamburger icon will appear automatically due to the drawer property
       ),
       drawer: Drawer(
@@ -1229,8 +1379,6 @@ class HomePage extends StatelessWidget {
                     userName = snapshot.data!['userName'] ?? userName;
                     profileImageUrl = snapshot.data!['profileImageUrl'] ?? '';
                   } else if (snapshot.hasError) {
-                    print(
-                        "Error in UserAccountsDrawerHeader FutureBuilder: ${snapshot.error}");
                     // Keep default userName, userEmail, profileImageUrl
                   }
                   // If still 'User' from default and no display name, try to get from email
@@ -1240,35 +1388,154 @@ class HomePage extends StatelessWidget {
                       user.email!.contains('@')) {
                     userName = user.email!.split('@')[0];
                   }
-
-                  return UserAccountsDrawerHeader(
-                    accountName: Text(
-                      userName,
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                    ),
-                    accountEmail: Text(userEmail,
-                        style: const TextStyle(color: Colors.white70)),
-                    currentAccountPicture: CircleAvatar(
-                      backgroundColor: Colors.white,
-                      backgroundImage: profileImageUrl.isNotEmpty
-                          ? NetworkImage(profileImageUrl)
-                          : null,
-                      child: profileImageUrl.isEmpty
-                          ? Text(
-                              userName.isNotEmpty
-                                  ? userName[0].toUpperCase()
-                                  : 'U',
-                              style: TextStyle(
-                                  fontSize: 40.0,
-                                  color: Theme.of(context).colorScheme.primary),
-                            )
-                          : null,
-                    ),
+                  return Container(
+                    height: 200,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.teal.shade400,
+                          Colors.teal.shade600,
+                          Colors.teal.shade800,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.2),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 32,
+                                  backgroundColor: Colors.white,
+                                  backgroundImage: profileImageUrl.isNotEmpty
+                                      ? NetworkImage(profileImageUrl)
+                                      : null,
+                                  child: profileImageUrl.isEmpty
+                                      ? Text(
+                                          userName.isNotEmpty
+                                              ? userName[0].toUpperCase()
+                                              : 'U',
+                                          style: TextStyle(
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.teal.shade700,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Hello!',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color:
+                                            Colors.white.withValues(alpha: 0.9),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      userName,
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.email_outlined,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    userEmail,
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.9),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.directions_car,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Parking Manager',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -1328,7 +1595,19 @@ class HomePage extends StatelessWidget {
                 );
               },
             ),
-            const Divider(),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    Colors.grey.shade300,
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
             _buildDrawerListTile(
               context,
               icon: Icons.logout,
@@ -1346,79 +1625,248 @@ class HomePage extends StatelessWidget {
           ],
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (user != null)
-                FutureBuilder<Map<String, String>>(
-                  future:
-                      _getUserDetails(user), // Use the new method here as well
-                  builder: (context, snapshot) {
-                    String welcomeName = 'User'; // Default
-                    if (snapshot.connectionState == ConnectionState.done &&
-                        snapshot.hasData) {
-                      welcomeName = snapshot.data!['userName'] ?? 'User';
-                    } else if (snapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      welcomeName = 'Loading...';
-                    } else if (snapshot.hasError) {
-                      print(
-                          "Error in Welcome Text FutureBuilder: ${snapshot.error}");
-                      // Keep default welcomeName
-                    }
-                    // If still 'User' and no display name, try to get from email
-                    if (welcomeName == 'User' &&
-                        (user.displayName == null ||
-                            user.displayName!.isEmpty) &&
-                        user.email != null &&
-                        user.email!.contains('@')) {
-                      welcomeName = user.email!.split('@')[0];
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24.0),
-                      child: Text(
-                        'Welcome, $welcomeName!',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall // Changed from headlineMedium to headlineSmall for consistency
-                            ?.copyWith(
-                                fontSize: 26, // Explicitly set font size
-                                color: Colors.teal[800]),
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  },
-                ),
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildHomeButton(
-                          context,
-                          icon: Icons
-                              .search_outlined, // Changed from Icons.search
-                          label: 'Book a Parking Spot',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const BookSpotPage(),
-                              ),
-                            );
-                          },
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.teal.shade50,
+              Colors.white,
+              Colors.teal.shade50,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Welcome Card
+                if (user != null)
+                  Card(
+                    elevation: 6,
+                    shadowColor: Colors.teal.withValues(alpha: 0.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white,
+                            Colors.teal.shade50,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        // Other buttons are now in the drawer
-                      ],
+                      ),
+                      padding: const EdgeInsets.all(24),
+                      child: FutureBuilder<Map<String, String>>(
+                        future: _getUserDetails(user),
+                        builder: (context, snapshot) {
+                          String welcomeName = 'User';
+                          if (snapshot.connectionState ==
+                                  ConnectionState.done &&
+                              snapshot.hasData) {
+                            welcomeName = snapshot.data!['userName'] ?? 'User';
+                          } else if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            welcomeName = 'Loading...';
+                          } else if (snapshot.hasError) {
+                            // Keep default welcomeName
+                          }
+                          if (welcomeName == 'User' &&
+                              (user.displayName == null ||
+                                  user.displayName!.isEmpty) &&
+                              user.email != null &&
+                              user.email!.contains('@')) {
+                            welcomeName = user.email!.split('@')[0];
+                          }
+
+                          return Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.shade100,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Icon(
+                                      Icons.waving_hand,
+                                      color: Colors.teal.shade700,
+                                      size: 28,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Welcome back!',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          welcomeName,
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.teal.shade800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.teal.shade200,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: Colors.teal.shade600,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Ready to find your perfect parking spot?',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.teal.shade700,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
+                const SizedBox(height: 24),
+                // Quick Action Section
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.flash_on,
+                              color: Colors.teal.shade700,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Quick Action',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Expanded(
+                        child: Center(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildHomeButton(
+                                  context,
+                                  icon: Icons.search_outlined,
+                                  label: 'Book a Parking Spot',
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const BookSpotPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                                // Additional features hint
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.menu,
+                                        color: Colors.grey[600],
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Explore more features in the menu',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward,
+                                        color: Colors.grey[400],
+                                        size: 16,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
