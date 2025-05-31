@@ -1118,24 +1118,49 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
-  Future<String> _getUserName(User user) async {
+  Future<Map<String, String>> _getUserDetails(User user) async {
+    String userName = 'User';
+    String profileImageUrl = '';
+
     // Try Firebase Auth display name first
     if (user.displayName != null && user.displayName!.isNotEmpty) {
-      return user.displayName!;
+      userName = user.displayName!;
     }
-    // Fallback to Firestore
+
+    // Fallback to Firestore for name and get profile image URL
     try {
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
       if (userDoc.exists && userDoc.data() != null) {
-        return userDoc.data()!['name'] ?? 'User';
+        final data = userDoc.data()!;
+        if (data.containsKey('name')) {
+          userName = data['name'] ?? userName;
+        } else {
+          final firstName = data['firstName'] as String?;
+          final lastName = data['lastName'] as String?;
+          if (firstName != null && lastName != null) {
+            userName = '$firstName $lastName'.trim();
+          } else if (firstName != null) {
+            userName = firstName.trim();
+          } else if (lastName != null) {
+            userName = lastName.trim();
+          }
+        }
+        profileImageUrl = data['profileImageUrl'] as String? ?? '';
       }
     } catch (e) {
-      // Log error or handle
+      print('Error getting user details from Firestore: $e');
     }
-    return 'User'; // Default if not found
+
+    // If auth display name was empty and firestore didn't provide one, ensure it's 'User'
+    if (userName.isEmpty &&
+        (user.displayName == null || user.displayName!.isEmpty)) {
+      userName = 'User';
+    }
+
+    return {'userName': userName, 'profileImageUrl': profileImageUrl};
   }
 
   Widget _buildHomeButton(
@@ -1160,6 +1185,23 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  Widget _buildDrawerListTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      title:
+          Text(title, style: TextStyle(color: Colors.grey[800], fontSize: 16)),
+      onTap: () {
+        Navigator.pop(context); // Close the drawer
+        onTap(); // Perform the action
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -1167,32 +1209,142 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Parking Manager Home'),
-        actions: [
-          // Profile Button
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.white),
-            tooltip: 'Profile',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const ProfilePage()),
-              );
-            },
-          ),
-          // Logout Button
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
+        // The hamburger icon will appear automatically due to the drawer property
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            if (user != null)
+              FutureBuilder<Map<String, String>>(
+                future: _getUserDetails(user), // Use the new method
+                builder: (context, snapshot) {
+                  String userName = user.displayName ??
+                      'User'; // Default to auth display name
+                  String userEmail = user.email ?? 'No email';
+                  String profileImageUrl = '';
+
+                  if (snapshot.connectionState == ConnectionState.done &&
+                      snapshot.hasData) {
+                    userName = snapshot.data!['userName'] ?? userName;
+                    profileImageUrl = snapshot.data!['profileImageUrl'] ?? '';
+                  } else if (snapshot.hasError) {
+                    print(
+                        "Error in UserAccountsDrawerHeader FutureBuilder: ${snapshot.error}");
+                    // Keep default userName, userEmail, profileImageUrl
+                  }
+                  // If still 'User' from default and no display name, try to get from email
+                  if (userName == 'User' &&
+                      (user.displayName == null || user.displayName!.isEmpty) &&
+                      user.email != null &&
+                      user.email!.contains('@')) {
+                    userName = user.email!.split('@')[0];
+                  }
+
+                  return UserAccountsDrawerHeader(
+                    accountName: Text(
+                      userName,
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
+                    ),
+                    accountEmail: Text(userEmail,
+                        style: const TextStyle(color: Colors.white70)),
+                    currentAccountPicture: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      backgroundImage: profileImageUrl.isNotEmpty
+                          ? NetworkImage(profileImageUrl)
+                          : null,
+                      child: profileImageUrl.isEmpty
+                          ? Text(
+                              userName.isNotEmpty
+                                  ? userName[0].toUpperCase()
+                                  : 'U',
+                              style: TextStyle(
+                                  fontSize: 40.0,
+                                  color: Theme.of(context).colorScheme.primary),
+                            )
+                          : null,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  );
+                },
+              )
+            else
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                child: const Text(
+                  'Parking Manager',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                  ),
+                ),
+              ),
+            _buildDrawerListTile(
+              context,
+              icon: Icons.account_circle_outlined,
+              title: 'Profile',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
                 );
-              }
-            },
-          ),
-        ],
+              },
+            ),
+            _buildDrawerListTile(
+              context,
+              icon: Icons.add_location_alt_outlined,
+              title: 'List a New Spot',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ListSpotPage()),
+                );
+              },
+            ),
+            _buildDrawerListTile(
+              context,
+              icon: Icons.history_edu_outlined,
+              title: 'My Listed Spots',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (context) => const ListingHistoryPage()),
+                );
+              },
+            ),
+            _buildDrawerListTile(
+              context,
+              icon: Icons.receipt_long_outlined,
+              title: 'My Booking History',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (context) => const BookingHistoryPage()),
+                );
+              },
+            ),
+            const Divider(),
+            _buildDrawerListTile(
+              context,
+              icon: Icons.logout,
+              title: 'Logout',
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
       ),
       body: SafeArea(
         child: Padding(
@@ -1201,22 +1353,41 @@ class HomePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (user != null)
-                FutureBuilder<String>(
-                  future: _getUserName(user),
+                FutureBuilder<Map<String, String>>(
+                  future:
+                      _getUserDetails(user), // Use the new method here as well
                   builder: (context, snapshot) {
-                    String welcomeName = 'User';
+                    String welcomeName = 'User'; // Default
                     if (snapshot.connectionState == ConnectionState.done &&
                         snapshot.hasData) {
-                      welcomeName = snapshot.data!;
+                      welcomeName = snapshot.data!['userName'] ?? 'User';
+                    } else if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      welcomeName = 'Loading...';
+                    } else if (snapshot.hasError) {
+                      print(
+                          "Error in Welcome Text FutureBuilder: ${snapshot.error}");
+                      // Keep default welcomeName
                     }
+                    // If still 'User' and no display name, try to get from email
+                    if (welcomeName == 'User' &&
+                        (user.displayName == null ||
+                            user.displayName!.isEmpty) &&
+                        user.email != null &&
+                        user.email!.contains('@')) {
+                      welcomeName = user.email!.split('@')[0];
+                    }
+
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 24.0),
                       child: Text(
                         'Welcome, $welcomeName!',
                         style: Theme.of(context)
                             .textTheme
-                            .headlineMedium
-                            ?.copyWith(color: Colors.teal[800]),
+                            .headlineSmall // Changed from headlineMedium to headlineSmall for consistency
+                            ?.copyWith(
+                                fontSize: 26, // Explicitly set font size
+                                color: Colors.teal[800]),
                         textAlign: TextAlign.center,
                       ),
                     );
@@ -1230,7 +1401,8 @@ class HomePage extends StatelessWidget {
                       children: [
                         _buildHomeButton(
                           context,
-                          icon: Icons.search,
+                          icon: Icons
+                              .search_outlined, // Changed from Icons.search
                           label: 'Book a Parking Spot',
                           onPressed: () {
                             Navigator.of(context).push(
@@ -1240,47 +1412,7 @@ class HomePage extends StatelessWidget {
                             );
                           },
                         ),
-                        const SizedBox(height: 20),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.add_location_alt_outlined,
-                          label: 'List a New Spot',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const ListSpotPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.history_edu_outlined,
-                          label: 'My Listed Spots',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ListingHistoryPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.receipt_long_outlined,
-                          label: 'My Booking History',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const BookingHistoryPage(),
-                              ),
-                            );
-                          },
-                        ),
+                        // Other buttons are now in the drawer
                       ],
                     ),
                   ),
