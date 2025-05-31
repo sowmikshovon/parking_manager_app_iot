@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
 
+import './pages/qr_scanner_page.dart';
 //import './pages/qr_code_page.dart';
 //import './pages/login_page.dart';
 //import './pages/listing_history_page.dart';
@@ -723,178 +724,6 @@ class BookingHistoryPage extends StatelessWidget {
   }
 }
 
-/*
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  Future<String> _getUserName(User user) async {
-    if (user.displayName != null && user.displayName!.isNotEmpty) {
-      return user.displayName!;
-    }
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (userDoc.exists && userDoc.data() != null) {
-        return userDoc.data()!['name'] ?? 'User';
-      }
-    } catch (e) {
-      // Log error or handle appropriately
-    }
-    return 'User';
-  }
-
-  Widget _buildHomeButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-    Color? backgroundColor,
-  }) {
-    return ElevatedButton.icon(
-      icon: Icon(icon, size: 24),
-      label: Text(label),
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor:
-            backgroundColor ?? Theme.of(context).colorScheme.primary,
-        minimumSize: const Size(double.infinity, 60),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        alignment: Alignment.centerLeft,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Parking Manager'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (user != null)
-                FutureBuilder<String>(
-                  future: _getUserName(user),
-                  builder: (context, snapshot) {
-                    String welcomeName = 'User';
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      welcomeName = 'Loading...';
-                    } else if (snapshot.hasData) {
-                      welcomeName = snapshot.data!;
-                    } else if (snapshot.hasError) {
-                      welcomeName = 'User (Error)';
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24.0),
-                      child: Text(
-                        'Welcome, $welcomeName!',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(fontSize: 26),
-                        textAlign: TextAlign.center,
-                      );
-                    },
-                  ),
-                ),
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.search_outlined,
-                          label: 'Book a Parking Spot',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const BookSpotPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.add_location_alt_outlined,
-                          label: 'List a New Spot',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const ListSpotPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.history_edu_outlined,
-                          label: 'My Listed Spots',
-                          backgroundColor: Colors.blueGrey[700],
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ListingHistoryPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildHomeButton(
-                          context,
-                          icon: Icons.receipt_long_outlined,
-                          label: 'My Booking History',
-                          backgroundColor: Colors.blueGrey[700],
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const BookingHistoryPage(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-*/
 class ListSpotPage extends StatefulWidget {
   const ListSpotPage({super.key});
 
@@ -1249,6 +1078,314 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildBookedSpotCard(
+    BuildContext context, {
+    required String spotId,
+    required String address,
+    required String timeString,
+    required String bookingId,
+  }) {
+    return Card(
+      elevation: 4,
+      shadowColor: Colors.orange.withValues(alpha: 0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [
+              Colors.orange.shade100,
+              Colors.orange.shade50,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(
+            color: Colors.orange.shade300,
+            width: 1.5,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () =>
+                _showUnbookingDialog(context, spotId, address, bookingId),
+            splashColor: Colors.orange.withValues(alpha: 0.2),
+            highlightColor: Colors.orange.withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade600,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.local_parking,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          address.length > 35
+                              ? '${address.substring(0, 35)}...'
+                              : address,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: Colors.orange.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Booked at $timeString',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    children: [
+                      Icon(
+                        Icons.touch_app,
+                        color: Colors.orange.shade600,
+                        size: 16,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tap to unbook',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.orange.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showUnbookingDialog(
+    BuildContext context,
+    String spotId,
+    String address,
+    String bookingId,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange.shade600,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Unbook Spot',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to unbook this parking spot?',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Colors.orange.shade700,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Address:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    address,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This will make the spot available for others to book.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Unbook'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _unbookSpot(context, spotId, bookingId);
+    }
+  }
+
+  Future<void> _unbookSpot(
+    BuildContext context,
+    String spotId,
+    String bookingId,
+  ) async {
+    try {
+      // Update the parking spot to be available
+      await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .update({'isAvailable': true});
+
+      // Update the booking status to completed
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .update({
+        'status': 'completed',
+        'endTime': Timestamp.now(),
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Parking spot successfully unbooked!'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Failed to unbook: ${e.toString()}'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildDrawerListTile(
@@ -1801,64 +1938,216 @@ class HomePage extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                       Expanded(
-                        child: Center(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildHomeButton(
-                                  context,
-                                  icon: Icons.search_outlined,
-                                  label: 'Book a Parking Spot',
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const BookSpotPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-                                // Additional features hint
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.grey.shade200,
-                                      width: 1,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              // Book a Parking Spot button
+                              _buildHomeButton(
+                                context,
+                                icon: Icons.search_outlined,
+                                label: 'Book a Parking Spot',
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const BookSpotPage(),
                                     ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.menu,
-                                        color: Colors.grey[600],
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          'Explore more features in the menu',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                            fontWeight: FontWeight.w500,
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Booked Spots Section
+                              if (user != null)
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('bookings')
+                                      .where('userId', isEqualTo: user.uid)
+                                      .where('status', isEqualTo: 'booked')
+                                      .snapshots(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const SizedBox(
+                                        height: 50,
+                                        child: Center(
+                                            child: CircularProgressIndicator()),
+                                      );
+                                    }
+
+                                    if (snapshot.hasError) {
+                                      return Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.shade50,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.red.shade200,
+                                            width: 1,
                                           ),
                                         ),
-                                      ),
-                                      Icon(
-                                        Icons.arrow_forward,
-                                        color: Colors.grey[400],
-                                        size: 16,
-                                      ),
-                                    ],
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.error_outline,
+                                              color: Colors.red[600],
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                'Error loading booked spots',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.red[700],
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+
+                                    final bookings = snapshot.data?.docs ?? [];
+
+                                    if (bookings.isNotEmpty) {
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Booked spots header
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.shade100,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: Icon(
+                                                  Icons.local_parking,
+                                                  color: Colors.orange.shade700,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Your Booked Spots',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.grey[800],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.shade600,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  '${bookings.length}',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          // Booked spots list
+                                          ...bookings.map((booking) {
+                                            final data = booking.data()
+                                                as Map<String, dynamic>;
+                                            final spotId =
+                                                data['spotId'] as String? ??
+                                                    'Unknown';
+                                            final address =
+                                                data['address'] as String? ??
+                                                    'No address';
+                                            final bookingTime =
+                                                data['bookingTime']
+                                                    as Timestamp?;
+                                            final timeString =
+                                                bookingTime != null
+                                                    ? bookingTime
+                                                        .toDate()
+                                                        .toLocal()
+                                                        .toString()
+                                                        .substring(11, 16)
+                                                    : 'Unknown';
+
+                                            return Container(
+                                              margin: const EdgeInsets.only(
+                                                  bottom: 12),
+                                              child: _buildBookedSpotCard(
+                                                context,
+                                                spotId: spotId,
+                                                address: address,
+                                                timeString: timeString,
+                                                bookingId: booking.id,
+                                              ),
+                                            );
+                                          }).toList(),
+                                          const SizedBox(height: 8),
+                                        ],
+                                      );
+                                    }
+
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
+
+                              // Additional features hint
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.grey.shade200,
+                                    width: 1,
                                   ),
                                 ),
-                              ],
-                            ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.menu,
+                                      color: Colors.grey[600],
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Explore more features in the menu',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_forward,
+                                      color: Colors.grey[400],
+                                      size: 16,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1955,7 +2244,7 @@ class QrCodePage extends StatelessWidget {
     );
   }
 }
-
+/*
 class BookSpotPage extends StatefulWidget {
   const BookSpotPage({super.key});
 
@@ -2156,6 +2445,480 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                         ),
                                       )
                                     : const Text('Confirm Booking'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_error != null)
+                  Positioned(
+                    top: 40,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+*/
+
+class BookSpotPage extends StatefulWidget {
+  const BookSpotPage({super.key});
+
+  @override
+  State<BookSpotPage> createState() => _BookSpotPageState();
+}
+
+class _BookSpotPageState extends State<BookSpotPage> {
+  bool _isLoading = false;
+  String? _error;
+  String? _selectedSpotId;
+  LatLng? _selectedLatLng;
+  String? _selectedAddress;
+
+  Future<String> _getUserName(User user) async {
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (userDoc.exists && userDoc.data() != null) {
+        return userDoc.data()!['name'] ?? 'User';
+      }
+    } catch (e) {
+      // Handle error appropriately
+    }
+    return 'User';
+  }
+
+  Future<void> _bookSpot(String spotId, String address) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _isLoading = false;
+        _error = 'You must be logged in to book a spot.';
+      });
+      return;
+    }
+    try {
+      await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .update({'isAvailable': false});
+      await FirebaseFirestore.instance.collection('bookings').add({
+        'spotId': spotId,
+        'userId': user.uid,
+        'address': address,
+        'status': 'booked',
+        'bookingTime': Timestamp.now(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Spot booked successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to book spot: \\${e.toString()}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _openQrScanner() {
+    if (_selectedSpotId == null || _selectedAddress == null) {
+      setState(() {
+        _error = 'Please select a parking spot first.';
+      });
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => QrScannerPage(
+          expectedSpotId: _selectedSpotId!,
+          address: _selectedAddress!,
+          onSuccess: () {
+            // This will be called when QR scan is successful
+            _bookSpot(_selectedSpotId!, _selectedAddress!);
+          },
+          onSkip: () {
+            // This will be called when user chooses to continue without QR scan
+            Navigator.of(context).pop(); // Close scanner page
+            _bookSpot(_selectedSpotId!, _selectedAddress!);
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Book a Parking Spot'),
+        actions: [
+          // Profile Button
+          IconButton(
+            icon: const Icon(Icons.account_circle, color: Colors.white),
+            tooltip: 'Profile',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
+          ),
+          // Logout Button
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Logout',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.directions_car,
+                      color: Colors.teal,
+                      size: 35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Parking Manager',
+                    style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),
+                  const SizedBox(height: 5),
+                  if (user != null)
+                    FutureBuilder<String>(
+                      future: _getUserName(user),
+                      builder: (context, snapshot) {
+                        String name = snapshot.data ?? 'User';
+                        return Text(
+                          name,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.search_outlined),
+              title: const Text('Book a Spot'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_location_alt_outlined),
+              title: const Text('List a New Spot'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ListSpotPage()),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.history_edu_outlined),
+              title: const Text('My Listed Spots'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ListingHistoryPage(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('My Booking History'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const BookingHistoryPage(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.account_circle),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () async {
+                Navigator.pop(context); // Close drawer
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFe0f7fa),
+              Color(0xFFb2ebf2),
+              Color(0xFF80deea),
+              Color(0xFF26c6da),
+            ],
+          ),
+        ),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('parking_spots')
+              .where('isAvailable', isEqualTo: true)
+              .orderBy('created_at', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: \\${snapshot.error}'));
+            }
+            final spots = snapshot.data?.docs ?? [];
+            if (spots.isEmpty) {
+              return const Center(
+                child: Text('No available spots at the moment.'),
+              );
+            }
+            final markers = <Marker>{};
+            for (final spot in spots) {
+              final data = spot.data() as Map<String, dynamic>;
+              final lat = (data['location']?['latitude'] as num?)?.toDouble();
+              final lng = (data['location']?['longitude'] as num?)?.toDouble();
+              final address = data['address'] as String? ?? 'No address';
+              final spotId = spot.id;
+              final ownerId = data['ownerId'] as String?;
+              final user = FirebaseAuth.instance.currentUser;
+              final isOwner = user != null && ownerId == user.uid;
+              if (lat != null && lng != null && !isOwner) {
+                markers.add(
+                  Marker(
+                    markerId: MarkerId(spotId),
+                    position: LatLng(lat, lng),
+                    infoWindow: InfoWindow(title: address),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueAzure,
+                    ),
+                    onTap: () {
+                      setState(() {
+                        _selectedSpotId = spotId;
+                        _selectedLatLng = LatLng(lat, lng);
+                        _selectedAddress = address;
+                      });
+                    },
+                  ),
+                );
+              }
+            }
+            return Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: markers.isNotEmpty
+                        ? markers.first.position
+                        : const LatLng(23.7624, 90.3785),
+                    zoom: 14,
+                  ),
+                  markers: markers,
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  onTap: (_) {
+                    setState(() {
+                      _selectedSpotId = null;
+                      _selectedLatLng = null;
+                      _selectedAddress = null;
+                    });
+                  },
+                ),
+                if (_selectedSpotId != null && _selectedLatLng != null)
+                  Positioned(
+                    bottom: 40,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Card(
+                        elevation: 8,
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _selectedAddress ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Lat: \\${_selectedLatLng!.latitude.toStringAsFixed(6)}, Lng: \\${_selectedLatLng!.longitude.toStringAsFixed(6)}',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              const SizedBox(height: 16),
+                              // QR Scanner Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _openQrScanner(),
+                                  icon: const Icon(Icons.qr_code_scanner),
+                                  label: const Text('Scan QR Code'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal[600],
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 4,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              // Regular Confirm Booking Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _bookSpot(
+                                            _selectedSpotId!,
+                                            _selectedAddress ?? '',
+                                          ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange[700],
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 2,
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Book without QR Scan',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                ),
                               ),
                             ],
                           ),

@@ -7,6 +7,7 @@ import 'list_spot_page.dart';
 import 'listing_history_page.dart';
 import 'booking_history_page.dart';
 import 'profile_page.dart';
+import 'qr_scanner_page.dart';
 
 class BookSpotPage extends StatefulWidget {
   const BookSpotPage({super.key});
@@ -85,6 +86,33 @@ class _BookSpotPageState extends State<BookSpotPage> {
         });
       }
     }
+  }
+
+  void _openQrScanner() {
+    if (_selectedSpotId == null || _selectedAddress == null) {
+      setState(() {
+        _error = 'Please select a parking spot first.';
+      });
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => QrScannerPage(
+          expectedSpotId: _selectedSpotId!,
+          address: _selectedAddress!,
+          onSuccess: () {
+            // This will be called when QR scan is successful
+            _bookSpot(_selectedSpotId!, _selectedAddress!);
+          },
+          onSkip: () {
+            // This will be called when user chooses to continue without QR scan
+            Navigator.of(context).pop(); // Close scanner page
+            _bookSpot(_selectedSpotId!, _selectedAddress!);
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -349,26 +377,70 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                 style: const TextStyle(fontSize: 13),
                               ),
                               const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _isLoading
-                                    ? null
-                                    : () => _bookSpot(
-                                          _selectedSpotId!,
-                                          _selectedAddress ?? '',
-                                        ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
+                              // QR Scanner Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _openQrScanner(),
+                                  icon: const Icon(Icons.qr_code_scanner),
+                                  label: const Text('Scan QR Code'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal[600],
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 4,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              // Regular Confirm Booking Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _bookSpot(
+                                            _selectedSpotId!,
+                                            _selectedAddress ?? '',
+                                          ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange[700],
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 2,
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Book without QR Scan',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      )
-                                    : const Text('Confirm Booking'),
+                                ),
                               ),
                             ],
                           ),
