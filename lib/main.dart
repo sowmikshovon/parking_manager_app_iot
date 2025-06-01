@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'firebase_options.dart';
+import 'package:intl/intl.dart'; // Add intl import for date formatting
 import 'qr_pdf_util.dart';
 
 import './pages/qr_scanner_page.dart';
@@ -1091,13 +1092,13 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildBookedSpotCard(
     BuildContext context, {
     required String spotId,
     required String address,
     required String timeString,
     required String bookingId,
+    required String expectedEndTime,
   }) {
     return Card(
       elevation: 4,
@@ -1166,8 +1167,7 @@ class HomePage extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                             color: Colors.orange.shade800,
                           ),
-                        ),
-                        const SizedBox(height: 4),
+                        ),                        const SizedBox(height: 4),
                         Row(
                           children: [
                             Icon(
@@ -1178,6 +1178,25 @@ class HomePage extends StatelessWidget {
                             const SizedBox(width: 4),
                             Text(
                               'Booked at $timeString',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              size: 14,
+                              color: Colors.orange.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Expected end: $expectedEndTime',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.orange.shade700,
@@ -2102,8 +2121,7 @@ class HomePage extends StatelessWidget {
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 12),
-                                          // Booked spots list
+                                          const SizedBox(height: 12),                                          // Booked spots list
                                           ...bookings.map((booking) {
                                             final data = booking.data()
                                                 as Map<String, dynamic>;
@@ -2124,6 +2142,13 @@ class HomePage extends StatelessWidget {
                                                         .toString()
                                                         .substring(11, 16)
                                                     : 'Unknown';
+                                            
+                                            // Calculate expected end time (2 hours from booking time)
+                                            final expectedEndTime = bookingTime != null
+                                                ? DateFormat('HH:mm').format(
+                                                    bookingTime.toDate().toLocal().add(const Duration(hours: 2))
+                                                  )
+                                                : 'Unknown';
 
                                             return Container(
                                               margin: const EdgeInsets.only(
@@ -2134,6 +2159,7 @@ class HomePage extends StatelessWidget {
                                                 address: address,
                                                 timeString: timeString,
                                                 bookingId: booking.id,
+                                                expectedEndTime: expectedEndTime,
                                               ),
                                             );
                                           }).toList(),
