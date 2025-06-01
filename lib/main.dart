@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'firebase_options.dart';
 import 'package:intl/intl.dart'; // Add intl import for date formatting
 import 'qr_pdf_util.dart';
+import 'dart:async'; // Add Timer import for background tracking
 
 import './pages/qr_scanner_page.dart';
 import './pages/profile_page.dart';
@@ -16,9 +17,65 @@ import './pages/profile_page.dart';
 
 // QrCodePage widget displays a QR code for a given parking spot
 
+// Utility class for managing expired spot tracking
+class ExpiredSpotTracker {
+  static Timer? _globalTimer;
+  static bool _isRunning = false;
+
+  // Start global background tracking
+  static void startGlobalTracking() {
+    if (_isRunning) return; // Already running
+
+    _isRunning = true;
+    _globalTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
+      checkAndUpdateExpiredSpots();
+    });
+
+    // Also run an immediate check
+    checkAndUpdateExpiredSpots();
+  }
+
+  // Stop global tracking
+  static void stopGlobalTracking() {
+    _globalTimer?.cancel();
+    _globalTimer = null;
+    _isRunning = false;
+  }
+
+  // Method to check and update expired spots
+  static Future<void> checkAndUpdateExpiredSpots() async {
+    try {
+      final now = DateTime.now();
+      final QuerySnapshot expiredSpots = await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .where('isAvailable', isEqualTo: true)
+          .where('availableUntil', isLessThanOrEqualTo: Timestamp.fromDate(now))
+          .get();
+
+      // Batch update expired spots to be unavailable
+      if (expiredSpots.docs.isNotEmpty) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (QueryDocumentSnapshot spot in expiredSpots.docs) {
+          batch.update(spot.reference, {'isAvailable': false});
+        }
+        await batch.commit();
+
+        print(
+            'ExpiredSpotTracker: Updated ${expiredSpots.docs.length} expired spots to unavailable');
+      }
+    } catch (e) {
+      print('Error in ExpiredSpotTracker: $e');
+    }
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Start global expired spot tracking
+  ExpiredSpotTracker.startGlobalTracking();
+
   runApp(const MyApp());
 }
 
@@ -518,22 +575,70 @@ class ListingHistoryPage extends StatelessWidget {
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
               final isAvailable = data['isAvailable'] == true;
-              final parkingDurationHours =
-                  data['parkingDurationHours'] as int? ?? 24;
+
+              // Check availability status based on time
+              final availableUntilTimestamp =
+                  data['availableUntil'] as Timestamp?;
+              final DateTime? availableUntil =
+                  availableUntilTimestamp?.toDate();
+              final bool isTimeExpired = availableUntil != null &&
+                  availableUntil.isBefore(DateTime.now());
+
+              String statusText = 'Available';
+              Color statusColor = Colors.green;
+              if (!isAvailable) {
+                statusText = 'Booked';
+                statusColor = Colors.orange;
+              } else if (isTimeExpired) {
+                statusText = 'Time Finished';
+                statusColor = Colors.red;
+              }
+
               return Card(
                 child: ListTile(
                   title: Text(address),
-                  subtitle: Text(
-                    'Spot ID: $spotId\nStatus: ${isAvailable ? 'Available' : 'Booked'}\nParking Duration: $parkingDurationHours hours',
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Spot ID: $spotId'),
+                      Row(
+                        children: [
+                          Text('Status: '),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (availableUntil != null)
+                        Text(
+                          'Available until: ${DateFormat.yMd().add_jm().format(availableUntil)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                    ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Re-enable button for expired spots
+                      if (isTimeExpired && isAvailable)
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: Colors.green),
+                          tooltip: 'Re-enable Availability',
+                          onPressed: () =>
+                              _showReEnableDialog(context, spotId, address),
+                        ),
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blue),
-                        tooltip: 'Edit Duration',
-                        onPressed: () => _showEditDurationDialog(context,
-                            spotId, parkingDurationHours, isAvailable, address),
+                        tooltip: 'Edit Availability',
+                        onPressed: () => _showEditAvailabilityDialog(context,
+                            spotId, availableUntil, isAvailable, address),
                       ),
                       IconButton(
                         icon: const Icon(Icons.qr_code, color: Colors.teal),
@@ -615,87 +720,24 @@ class ListingHistoryPage extends StatelessWidget {
     );
   }
 
-  // Method to show edit duration dialog
-  static Future<void> _showEditDurationDialog(
+  // Method to show re-enable availability dialog for expired spots
+  static Future<void> _showReEnableDialog(
     BuildContext context,
     String spotId,
-    int currentDuration,
-    bool isAvailable,
     String address,
   ) async {
-    final TextEditingController durationController =
-        TextEditingController(text: currentDuration.toString());
-
-    await showDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit Parking Duration'),
+        title: const Text('Re-enable Availability'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Address: $address',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
-              ),
-            ),
+            Text('Address: $address'),
             const SizedBox(height: 16),
-            if (!isAvailable)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.orange.shade600,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This spot is currently booked. Changing duration will affect the booking.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.orange.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: durationController,
-              decoration: const InputDecoration(
-                labelText: 'Parking Duration (hours)',
-                prefixIcon: Icon(Icons.schedule_outlined),
-                hintText: 'e.g., 24',
-                helperText: 'How long can users park here?',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter parking duration';
-                }
-                final duration = int.tryParse(value);
-                if (duration == null || duration <= 0) {
-                  return 'Please enter a valid number of hours';
-                }
-                if (duration > 168) {
-                  // 7 days max
-                  return 'Maximum duration is 168 hours (7 days)';
-                }
-                return null;
-              },
-            ),
+            const Text(
+                'This spot\'s availability has expired. Would you like to set a new availability period?'),
           ],
         ),
         actions: [
@@ -704,38 +746,170 @@ class ListingHistoryPage extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              final newDuration = int.tryParse(durationController.text);
-              if (newDuration != null &&
-                  newDuration > 0 &&
-                  newDuration <= 168) {
-                Navigator.of(context).pop(true);
-                _updateParkingDuration(context, spotId, newDuration);
-              }
-            },
+            onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
+              backgroundColor: Colors.green.shade600,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Update'),
+            child: const Text('Re-enable'),
           ),
         ],
       ),
     );
+
+    if (confirm == true) {
+      _showEditAvailabilityDialog(context, spotId, null, true, address);
+    }
   }
 
-  // Method to update parking duration in Firestore
-  static Future<void> _updateParkingDuration(
+  // Method to show edit availability dialog
+  static Future<void> _showEditAvailabilityDialog(
     BuildContext context,
     String spotId,
-    int newDuration,
+    DateTime? currentAvailableUntil,
+    bool isAvailable,
+    String address,
+  ) async {
+    DateTime? selectedDateTime = currentAvailableUntil;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit Availability'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Address: $address',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (!isAvailable)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange.shade600,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This spot is currently booked. Changing availability will affect the booking.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.access_time_outlined),
+                  title: Text(
+                    selectedDateTime == null
+                        ? 'Select new availability end time'
+                        : 'Available until: ${DateFormat.yMd().add_jm().format(selectedDateTime!)}',
+                    style: TextStyle(
+                      color: selectedDateTime == null
+                          ? Colors.grey[600]
+                          : Colors.black87,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.keyboard_arrow_right),
+                  onTap: () async {
+                    final DateTime now = DateTime.now();
+                    final DateTime? date = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDateTime ??
+                          now.add(const Duration(hours: 24)),
+                      firstDate: now,
+                      lastDate: now.add(const Duration(days: 30)),
+                      helpText: 'Select availability end date',
+                    );
+
+                    if (date != null) {
+                      final TimeOfDay? time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(selectedDateTime ??
+                            date.add(const Duration(hours: 1))),
+                        helpText: 'Select availability end time',
+                      );
+
+                      if (time != null) {
+                        setState(() {
+                          selectedDateTime = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            time.hour,
+                            time.minute,
+                          );
+                        });
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: selectedDateTime != null &&
+                      selectedDateTime!.isAfter(DateTime.now())
+                  ? () {
+                      Navigator.of(context).pop();
+                      _updateAvailability(context, spotId, selectedDateTime!);
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade600,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Method to update availability in Firestore
+  static Future<void> _updateAvailability(
+    BuildContext context,
+    String spotId,
+    DateTime newAvailableUntil,
   ) async {
     try {
       await FirebaseFirestore.instance
           .collection('parking_spots')
           .doc(spotId)
           .update({
-        'parkingDurationHours': newDuration,
+        'availableUntil': Timestamp.fromDate(newAvailableUntil),
+        'isAvailable': true, // Re-enable availability
       });
 
       if (context.mounted) {
@@ -745,7 +919,8 @@ class ListingHistoryPage extends StatelessWidget {
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 12),
-                Text('Parking duration updated to $newDuration hours'),
+                Text(
+                    'Availability updated until ${DateFormat.yMd().add_jm().format(newAvailableUntil)}'),
               ],
             ),
             backgroundColor: Colors.green[600],
@@ -766,7 +941,7 @@ class ListingHistoryPage extends StatelessWidget {
                 const Icon(Icons.error, color: Colors.white),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text('Failed to update duration: ${e.toString()}'),
+                  child: Text('Failed to update availability: ${e.toString()}'),
                 ),
               ],
             ),
@@ -869,10 +1044,10 @@ class BookingHistoryPage extends StatelessWidget {
           }
           return ListView.builder(
             itemCount: bookings.length,
-            itemBuilder: (context, index) {
-              final booking = bookings[index];
+            itemBuilder: (context, index) {              final booking = bookings[index];
               final data = booking.data() as Map<String, dynamic>;
               final spotId = data['spotId'] as String? ?? 'N/A';
+              final address = data['address'] as String? ?? 'No address';
               final status = data['status'] as String? ?? 'Unknown';
               final bookingTimeTimestamp = data['bookingTime'] as Timestamp?;
               final endTimeTimestamp = data['endTime'] as Timestamp?;
@@ -887,7 +1062,7 @@ class BookingHistoryPage extends StatelessWidget {
 
               return Card(
                 child: ListTile(
-                  title: Text('Spot ID: $spotId'),
+                  title: Text(address),
                   subtitle: Text(
                     'Status: $status\nBooked: $bookingTime\nEnded: $endTime',
                   ),
@@ -1089,63 +1264,135 @@ class AddressEntryPage extends StatefulWidget {
 
 class _AddressEntryPageState extends State<AddressEntryPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _durationController =
-      TextEditingController(text: '24');
+  final _addressController = TextEditingController();
+  DateTime? _selectedDateTime;
   bool _isLoading = false;
 
-  Future<void> _submitSpot() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('You must be logged in to list a spot.'),
-              backgroundColor: Colors.red,
-            ),
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  String _formatDateTime(BuildContext context, DateTime dateTime) {
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
+    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
+
+    final String date = DateFormat.yMd().format(dateTime);
+    final String time = is24HourFormat
+        ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
+        : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
+    return '$date $time';
+  }
+
+  Future<void> _selectDateTime(BuildContext context) async {
+    final DateTime now = DateTime.now();
+    final DateTime? date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDateTime ?? now.add(const Duration(hours: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 30)),
+      helpText: 'SELECT AVAILABILITY END DATE',
+    );
+
+    if (date != null && context.mounted) {
+      final TimeOfDay? time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(
+            _selectedDateTime ?? date.add(const Duration(hours: 1))),
+        helpText: 'SELECT AVAILABILITY END TIME',
+      );
+
+      if (time != null) {
+        setState(() {
+          _selectedDateTime = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            time.hour,
+            time.minute,
           );
-        }
-        setState(() => _isLoading = false);
-        return;
-      }
-      try {
-        final docRef =
-            await FirebaseFirestore.instance.collection('parking_spots').add({
-          'address': _addressController.text.trim(),
-          'location': {
-            'latitude': widget.selectedLatLng.latitude,
-            'longitude': widget.selectedLatLng.longitude,
-          },
-          'ownerId': user.uid,
-          'isAvailable': true,
-          'created_at': FieldValue.serverTimestamp(),
-          'parkingDurationHours': int.tryParse(_durationController.text) ?? 24,
         });
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => QrCodePage(
-                spotId: docRef.id,
-                address: _addressController.text.trim(),
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to list spot: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+      }
+    }
+  }
+
+  Future<void> _submitSpot() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    if (_selectedDateTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Please select the date and time the spot will be available until.'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+      return;
+    }
+
+    // Ensure the selected date and time is in the future
+    if (_selectedDateTime!
+        .isBefore(DateTime.now().add(const Duration(minutes: 5)))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Availability must be at least 5 minutes in the future.'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You must be logged in to list a spot.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('parking_spots').add({
+        'address': _addressController.text,
+        'latitude': widget.selectedLatLng.latitude,
+        'longitude': widget.selectedLatLng.longitude,
+        'isAvailable': true,
+        'availableUntil': Timestamp.fromDate(_selectedDateTime!),
+        'ownerId': user.uid,
+        'created_at': FieldValue.serverTimestamp(),
+        'userEmail': user.email,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Parking spot listed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context); // Go back to the previous screen
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error listing spot: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -1153,103 +1400,113 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Enter Address')),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFe0f7fa),
-              Color(0xFFb2ebf2),
-              Color(0xFF80deea),
-              Color(0xFF26c6da),
-            ],
-          ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Enter Spot Address',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Lat: ${widget.selectedLatLng.latitude.toStringAsFixed(6)}, Lng: ${widget.selectedLatLng.longitude.toStringAsFixed(6)}',
-                        style: TextStyle(color: Colors.teal[700]),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _addressController,
-                        decoration: const InputDecoration(
-                          labelText: 'Address',
-                          prefixIcon: Icon(Icons.location_on_outlined),
-                          hintText: 'e.g., 123 Main St, Anytown',
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter the address';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _durationController,
-                        decoration: const InputDecoration(
-                          labelText: 'Parking Duration (hours)',
-                          prefixIcon: Icon(Icons.schedule_outlined),
-                          hintText: 'e.g., 24',
-                          helperText: 'How long can users park here?',
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter parking duration';
-                          }
-                          final duration = int.tryParse(value);
-                          if (duration == null || duration <= 0) {
-                            return 'Please enter a valid number of hours';
-                          }
-                          if (duration > 168) {
-                            // 7 days max
-                            return 'Maximum duration is 168 hours (7 days)';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _submitSpot,
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+      appBar: AppBar(
+        title: const Text('Confirm Spot Details'),
+        elevation: 2,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                'Location:',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Lat: ${widget.selectedLatLng.latitude.toStringAsFixed(6)}, Lng: ${widget.selectedLatLng.longitude.toStringAsFixed(6)}',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _addressController,
+                decoration: const InputDecoration(
+                  labelText: 'Address or Description',
+                  hintText: 'e.g., Near the park entrance',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter an address or description.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Available Until:',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () => _selectDateTime(context),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: <Widget>[
+                      Expanded(
+                        // Wrap the Text widget with Expanded
+                        child: Text(
+                          _selectedDateTime == null
+                              ? 'Select Date & Time'
+                              : 'Ends: ${_formatDateTime(context, _selectedDateTime!)}',
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: _selectedDateTime == null
+                                        ? Theme.of(context).hintColor
+                                        : null,
                                   ),
-                                ),
-                              )
-                            : const Text('Finish Listing'),
+                          overflow: TextOverflow.ellipsis, // Prevent overflow
+                        ),
                       ),
+                      const Icon(Icons.calendar_today),
                     ],
                   ),
                 ),
               ),
-            ),
+              if (_selectedDateTime == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    'Please select when your spot will be available until.',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 30),
+              ElevatedButton.icon(
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_circle_outline),
+                label:
+                    Text(_isLoading ? 'LISTING...' : 'CONFIRM AND LIST SPOT'),
+                onPressed: _isLoading ? null : _submitSpot,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1257,9 +1514,32 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
   }
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage(
-      {super.key}); // Helper method to format just time according to device settings
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    // Check for expired spots once when page loads
+    // Global tracker will handle periodic updates
+    _checkExpiredSpotsOnLoad();
+  }
+
+  // Check expired spots once when page loads using global tracker
+  Future<void> _checkExpiredSpotsOnLoad() async {
+    try {
+      await ExpiredSpotTracker.checkAndUpdateExpiredSpots();
+    } catch (e) {
+      print('Error checking expired spots on HomePage load: $e');
+    }
+  }
+
+  // Helper method to format just time according to device settings
   static String _formatTime(BuildContext context, DateTime dateTime) {
     final MediaQueryData mediaQuery = MediaQuery.of(context);
     final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
@@ -1416,14 +1696,13 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildBookedSpotCard(
     BuildContext context, {
     required String spotId,
     required String address,
     required String timeString,
     required String bookingId,
-    required String expectedEndTime,
+    required String expectedEndTime, // This now contains remaining time
   }) {
     return Card(
       elevation: 4,
@@ -1512,8 +1791,7 @@ class HomePage extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Row(
+                        const SizedBox(height: 4),                        Row(
                           children: [
                             Icon(
                               Icons.schedule,
@@ -1522,7 +1800,7 @@ class HomePage extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Expected end: $expectedEndTime',
+                              expectedEndTime,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.orange.shade700,
@@ -1805,8 +2083,7 @@ class HomePage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
+                  ),                  child: Icon(
                     Icons.chevron_right,
                     color: Colors.grey[400],
                     size: 16,
@@ -1818,6 +2095,30 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Method to automatically expire a booking and move it to history
+  Future<void> _expireBooking(String bookingId, String spotId) async {
+    try {
+      // Update the booking status to expired
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .update({
+        'status': 'expired',
+        'endTime': Timestamp.now(),
+      });
+
+      // Update the parking spot to be available again
+      await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .update({'isAvailable': true});
+
+      print('Booking $bookingId automatically expired and moved to history');
+    } catch (e) {
+      print('Error expiring booking $bookingId: $e');
+    }
   }
 
   @override
@@ -2516,19 +2817,30 @@ class HomePage extends StatelessWidget {
                                                     parkingDurationHours =
                                                         spotData?['parkingDurationHours']
                                                                 as int? ??
-                                                            24;
-                                                  } // Calculate expected end time using spot's custom duration
-                                                  final expectedEndTime =
-                                                      bookingTime != null
-                                                          ? _formatTime(
-                                                              context,
-                                                              bookingTime
-                                                                  .toDate()
-                                                                  .toLocal()
-                                                                  .add(Duration(
-                                                                      hours:
-                                                                          parkingDurationHours)))
-                                                          : 'Unknown';
+                                                            24;                                                  } // Calculate remaining time until end and handle expiration
+                                                  String remainingTime = 'Unknown';
+                                                  if (bookingTime != null) {
+                                                    final endTime = bookingTime
+                                                        .toDate()
+                                                        .toLocal()
+                                                        .add(Duration(hours: parkingDurationHours));
+                                                    final now = DateTime.now();
+                                                    final difference = endTime.difference(now);
+                                                    
+                                                    if (difference.isNegative) {
+                                                      // Automatically expire the booking
+                                                      _expireBooking(booking.id, spotId);
+                                                      return const SizedBox.shrink(); // Don't show expired bookings
+                                                    } else {
+                                                      final hours = difference.inHours;
+                                                      final minutes = difference.inMinutes % 60;
+                                                      if (hours > 0) {
+                                                        remainingTime = '${hours}h ${minutes}m remaining';
+                                                      } else {
+                                                        remainingTime = '${minutes}m remaining';
+                                                      }
+                                                    }
+                                                  }
 
                                                   return _buildBookedSpotCard(
                                                     context,
@@ -2536,8 +2848,7 @@ class HomePage extends StatelessWidget {
                                                     address: address,
                                                     timeString: timeString,
                                                     bookingId: booking.id,
-                                                    expectedEndTime:
-                                                        expectedEndTime,
+                                                    expectedEndTime: remainingTime,
                                                   );
                                                 },
                                               ),
@@ -2635,16 +2946,17 @@ class QrCodePage extends StatelessWidget {
                   data: spotId,
                   version: QrVersions.auto,
                   size: 200.0,
-                ),
-                const SizedBox(height: 16),
+                ),                const SizedBox(height: 16),
                 Text(
-                  'Spot ID: $spotId',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  address,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  address,
+                  'Scan this QR code to verify parking spot',
                   style: Theme.of(context).textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -2700,6 +3012,13 @@ class _BookSpotPageState extends State<BookSpotPage> {
   String? _selectedSpotId;
   LatLng? _selectedLatLng;
   String? _selectedAddress;
+
+  @override
+  void initState() {
+    super.initState();
+    // Trigger an immediate check when the page loads
+    ExpiredSpotTracker.checkAndUpdateExpiredSpots();
+  }
 
   Future<String> _getUserName(User user) async {
     if (user.displayName != null && user.displayName!.isNotEmpty) {
@@ -2952,11 +3271,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
               Color(0xFF26c6da),
             ],
           ),
-        ),
-        child: StreamBuilder<QuerySnapshot>(
+        ),        child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('parking_spots')
-              .where('isAvailable', isEqualTo: true)
               .orderBy('created_at', descending: true)
               .snapshots(),
           builder: (context, snapshot) {
@@ -2965,23 +3282,50 @@ class _BookSpotPageState extends State<BookSpotPage> {
             }
             if (snapshot.hasError) {
               return Center(child: Text('Error: \\${snapshot.error}'));
-            }
-            final spots = snapshot.data?.docs ?? [];
-            if (spots.isEmpty) {
-              return const Center(
-                child: Text('No available spots at the moment.'),
-              );
-            }
-            final markers = <Marker>{};
+            }            final spots = snapshot.data?.docs ?? [];
+
+            // Separate spots into available and expired
+            final availableSpots = <QueryDocumentSnapshot>[];
+            final expiredSpots = <QueryDocumentSnapshot>[];
+            
             for (final spot in spots) {
               final data = spot.data() as Map<String, dynamic>;
-              final lat = (data['location']?['latitude'] as num?)?.toDouble();
-              final lng = (data['location']?['longitude'] as num?)?.toDouble();
+              final availableUntilTimestamp = data['availableUntil'] as Timestamp?;
+              final isCurrentlyAvailable = data['isAvailable'] as bool? ?? false;
+              
+              if (availableUntilTimestamp == null) {
+                // No time restriction, check isAvailable flag
+                if (isCurrentlyAvailable) {
+                  availableSpots.add(spot);
+                } else {
+                  expiredSpots.add(spot);
+                }
+              } else {
+                final availableUntil = availableUntilTimestamp.toDate();
+                if (availableUntil.isAfter(DateTime.now()) && isCurrentlyAvailable) {
+                  availableSpots.add(spot);
+                } else {
+                  expiredSpots.add(spot);
+                }
+              }
+            }
+
+            final markers = <Marker>{};
+            final user = FirebaseAuth.instance.currentUser;
+            
+            // Add available spots with blue markers
+            for (final spot in availableSpots) {
+              final data = spot.data() as Map<String, dynamic>;
+              // Check for both old nested format and new direct format
+              final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 
+                         (data['latitude'] as num?)?.toDouble();
+              final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 
+                         (data['longitude'] as num?)?.toDouble();
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
               final ownerId = data['ownerId'] as String?;
-              final user = FirebaseAuth.instance.currentUser;
               final isOwner = user != null && ownerId == user.uid;
+              
               if (lat != null && lng != null && !isOwner) {
                 markers.add(
                   Marker(
@@ -2989,7 +3333,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     position: LatLng(lat, lng),
                     infoWindow: InfoWindow(title: address),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueAzure,
+                      BitmapDescriptor.hueAzure, // Blue for available spots
                     ),
                     onTap: () {
                       setState(() {
@@ -3002,6 +3346,120 @@ class _BookSpotPageState extends State<BookSpotPage> {
                 );
               }
             }
+            
+            // Add expired spots with red markers
+            for (final spot in expiredSpots) {
+              final data = spot.data() as Map<String, dynamic>;
+              // Check for both old nested format and new direct format
+              final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 
+                         (data['latitude'] as num?)?.toDouble();
+              final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 
+                         (data['longitude'] as num?)?.toDouble();
+              final address = data['address'] as String? ?? 'No address';
+              final spotId = spot.id;
+              final ownerId = data['ownerId'] as String?;
+              final isOwner = user != null && ownerId == user.uid;
+              
+              if (lat != null && lng != null && !isOwner) {
+                markers.add(
+                  Marker(
+                    markerId: MarkerId('expired_$spotId'),
+                    position: LatLng(lat, lng),
+                    infoWindow: InfoWindow(title: '$address (Unavailable)'),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueRed, // Red for expired spots
+                    ),
+                    onTap: () {
+                      // Show unavailable message for expired spots
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.info_outline, color: Colors.white),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'This spot is unavailable. Please look for another one.',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.orange.shade600,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          margin: const EdgeInsets.all(16),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                      // Clear any selected spot
+                      setState(() {
+                        _selectedSpotId = null;
+                        _selectedLatLng = null;
+                        _selectedAddress = null;
+                      });
+                    },
+                  ),
+                );
+              }
+            }
+
+            // Show message if no available spots
+            if (availableSpots.isEmpty && expiredSpots.isEmpty) {
+              return const Center(
+                child: Text('No parking spots found at the moment.'),
+              );
+            }
+            
+            if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
+              return Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: markers.isNotEmpty
+                          ? markers.first.position
+                          : const LatLng(23.7624, 90.3785),
+                      zoom: 14,
+                    ),
+                    markers: markers,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    onTap: (_) {
+                      setState(() {
+                        _selectedSpotId = null;
+                        _selectedLatLng = null;
+                        _selectedAddress = null;
+                      });
+                    },
+                  ),
+                  Positioned(
+                    top: 100,
+                    left: 16,
+                    right: 16,
+                    child: Card(
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.orange.shade600),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'No available spots at the moment. Red markers show unavailable spots.',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );            }
+            
             return Stack(
               children: [
                 GoogleMap(
@@ -3013,14 +3471,60 @@ class _BookSpotPageState extends State<BookSpotPage> {
                   ),
                   markers: markers,
                   myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  onTap: (_) {
+                  myLocationButtonEnabled: true,                  onTap: (_) {
                     setState(() {
                       _selectedSpotId = null;
                       _selectedLatLng = null;
                       _selectedAddress = null;
                     });
                   },
+                ),
+                // Legend for marker colors
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: Card(
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  color: Colors.blue,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text('Available', style: TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text('Unavailable', style: TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
                 if (_selectedSpotId != null && _selectedLatLng != null)
                   Positioned(
