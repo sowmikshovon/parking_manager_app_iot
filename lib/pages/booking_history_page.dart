@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class BookingHistoryPage extends StatelessWidget {
   const BookingHistoryPage({super.key});
+
+  // Helper method to format date and time according to device settings
+  static String _formatDateTime(BuildContext context, DateTime dateTime) {
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
+    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
+
+    final String date = DateFormat.yMd().format(dateTime);
+    final String time = is24HourFormat
+        ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
+        : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
+    return '$date $time';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,17 +58,12 @@ class BookingHistoryPage extends StatelessWidget {
               final bookingTimeTimestamp = data['bookingTime'] as Timestamp?;
               final endTimeTimestamp = data['endTime'] as Timestamp?;
               final bookingTime = bookingTimeTimestamp != null
-                  ? bookingTimeTimestamp
-                        .toDate()
-                        .toLocal()
-                        .toString()
-                        .substring(0, 16)
+                  ? _formatDateTime(
+                      context, bookingTimeTimestamp.toDate().toLocal())
                   : 'N/A';
               final endTime = endTimeTimestamp != null
-                  ? endTimeTimestamp.toDate().toLocal().toString().substring(
-                      0,
-                      16,
-                    )
+                  ? _formatDateTime(
+                      context, endTimeTimestamp.toDate().toLocal())
                   : 'N/A';
 
               return Card(
@@ -79,9 +87,9 @@ class BookingHistoryPage extends StatelessWidget {
                                   .collection('bookings')
                                   .doc(booking.id)
                                   .update({
-                                    'status': 'completed',
-                                    'endTime': Timestamp.now(),
-                                  });
+                                'status': 'completed',
+                                'endTime': Timestamp.now(),
+                              });
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(

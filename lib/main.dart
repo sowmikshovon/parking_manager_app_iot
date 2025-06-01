@@ -518,15 +518,23 @@ class ListingHistoryPage extends StatelessWidget {
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
               final isAvailable = data['isAvailable'] == true;
+              final parkingDurationHours =
+                  data['parkingDurationHours'] as int? ?? 24;
               return Card(
                 child: ListTile(
                   title: Text(address),
                   subtitle: Text(
-                    'Spot ID: $spotId\nStatus: ${isAvailable ? 'Available' : 'Booked'}',
+                    'Spot ID: $spotId\nStatus: ${isAvailable ? 'Available' : 'Booked'}\nParking Duration: $parkingDurationHours hours',
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        tooltip: 'Edit Duration',
+                        onPressed: () => _showEditDurationDialog(context,
+                            spotId, parkingDurationHours, isAvailable, address),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.qr_code, color: Colors.teal),
                         tooltip: 'Show QR Code',
@@ -606,10 +614,228 @@ class ListingHistoryPage extends StatelessWidget {
       ),
     );
   }
+
+  // Method to show edit duration dialog
+  static Future<void> _showEditDurationDialog(
+    BuildContext context,
+    String spotId,
+    int currentDuration,
+    bool isAvailable,
+    String address,
+  ) async {
+    final TextEditingController durationController =
+        TextEditingController(text: currentDuration.toString());
+
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Parking Duration'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Address: $address',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (!isAvailable)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This spot is currently booked. Changing duration will affect the booking.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: durationController,
+              decoration: const InputDecoration(
+                labelText: 'Parking Duration (hours)',
+                prefixIcon: Icon(Icons.schedule_outlined),
+                hintText: 'e.g., 24',
+                helperText: 'How long can users park here?',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter parking duration';
+                }
+                final duration = int.tryParse(value);
+                if (duration == null || duration <= 0) {
+                  return 'Please enter a valid number of hours';
+                }
+                if (duration > 168) {
+                  // 7 days max
+                  return 'Maximum duration is 168 hours (7 days)';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newDuration = int.tryParse(durationController.text);
+              if (newDuration != null &&
+                  newDuration > 0 &&
+                  newDuration <= 168) {
+                Navigator.of(context).pop(true);
+                _updateParkingDuration(context, spotId, newDuration);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Method to update parking duration in Firestore
+  static Future<void> _updateParkingDuration(
+    BuildContext context,
+    String spotId,
+    int newDuration,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .update({
+        'parkingDurationHours': newDuration,
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Text('Parking duration updated to $newDuration hours'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Failed to update duration: ${e.toString()}'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
 }
 
 class BookingHistoryPage extends StatelessWidget {
   const BookingHistoryPage({super.key});
+  // Helper method to format date and time according to device settings
+  static String _formatDateTime(BuildContext context, DateTime dateTime) {
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
+    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
+
+    final String date = DateFormat.yMd().format(dateTime);
+    final String time = is24HourFormat
+        ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
+        : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
+    return '$date $time';
+  }
+
+  // Helper method to check if parking spot exists and clean up orphaned bookings
+  static Future<void> _cleanupOrphanedBooking(
+      String bookingId, String spotId) async {
+    try {
+      // Check if the parking spot still exists
+      final spotDoc = await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .get();
+
+      // If spot doesn't exist, mark booking as completed and remove from active bookings
+      if (!spotDoc.exists) {
+        await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .update({
+          'status': 'spot_deleted',
+          'endTime': Timestamp.now(),
+          'note': 'Parking spot was deleted by owner',
+        });
+      }
+    } catch (e) {
+      // If there's an error checking the spot, it likely doesn't exist
+      // Mark the booking as completed
+      try {
+        await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .update({
+          'status': 'spot_deleted',
+          'endTime': Timestamp.now(),
+          'note': 'Parking spot no longer available',
+        });
+      } catch (updateError) {
+        // If we can't update the booking, at least we tried
+        print('Error cleaning up orphaned booking: $updateError');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -651,17 +877,12 @@ class BookingHistoryPage extends StatelessWidget {
               final bookingTimeTimestamp = data['bookingTime'] as Timestamp?;
               final endTimeTimestamp = data['endTime'] as Timestamp?;
               final bookingTime = bookingTimeTimestamp != null
-                  ? bookingTimeTimestamp
-                      .toDate()
-                      .toLocal()
-                      .toString()
-                      .substring(0, 16)
+                  ? _formatDateTime(
+                      context, bookingTimeTimestamp.toDate().toLocal())
                   : 'N/A';
               final endTime = endTimeTimestamp != null
-                  ? endTimeTimestamp.toDate().toLocal().toString().substring(
-                        0,
-                        16,
-                      )
+                  ? _formatDateTime(
+                      context, endTimeTimestamp.toDate().toLocal())
                   : 'N/A';
 
               return Card(
@@ -677,35 +898,101 @@ class BookingHistoryPage extends StatelessWidget {
                           ),
                           onPressed: () async {
                             try {
-                              await FirebaseFirestore.instance
+                              // First check if the parking spot still exists
+                              final spotDoc = await FirebaseFirestore.instance
                                   .collection('parking_spots')
                                   .doc(spotId)
-                                  .update({'isAvailable': true});
-                              await FirebaseFirestore.instance
-                                  .collection('bookings')
-                                  .doc(booking.id)
-                                  .update({
-                                'status': 'completed',
-                                'endTime': Timestamp.now(),
-                              });
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Parking ended and spot relisted!',
+                                  .get();
+
+                              if (spotDoc.exists) {
+                                // Spot exists, proceed with normal end parking
+                                await FirebaseFirestore.instance
+                                    .collection('parking_spots')
+                                    .doc(spotId)
+                                    .update({'isAvailable': true});
+                                await FirebaseFirestore.instance
+                                    .collection('bookings')
+                                    .doc(booking.id)
+                                    .update({
+                                  'status': 'completed',
+                                  'endTime': Timestamp.now(),
+                                });
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Parking ended and spot relisted!',
+                                      ),
                                     ),
-                                  ),
-                                );
+                                  );
+                                }
+                              } else {
+                                // Spot no longer exists, just mark booking as completed
+                                await FirebaseFirestore.instance
+                                    .collection('bookings')
+                                    .doc(booking.id)
+                                    .update({
+                                  'status': 'spot_deleted',
+                                  'endTime': Timestamp.now(),
+                                  'note': 'Parking spot was deleted by owner',
+                                });
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Booking ended (spot no longer available)',
+                                      ),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                }
                               }
                             } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Failed to end parking: \\${e.toString()}',
+                              // Handle the case where spot might not exist
+                              if (e.toString().contains('not-found')) {
+                                try {
+                                  // Just mark booking as completed since spot doesn't exist
+                                  await FirebaseFirestore.instance
+                                      .collection('bookings')
+                                      .doc(booking.id)
+                                      .update({
+                                    'status': 'spot_deleted',
+                                    'endTime': Timestamp.now(),
+                                    'note': 'Parking spot no longer available',
+                                  });
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Booking ended (spot no longer available)',
+                                        ),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                } catch (updateError) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Error ending booking: ${updateError.toString()}',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } else {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Failed to end parking: ${e.toString()}',
+                                      ),
+                                      backgroundColor: Colors.red,
                                     ),
-                                  ),
-                                );
+                                  );
+                                }
                               }
                             }
                           },
@@ -803,6 +1090,8 @@ class AddressEntryPage extends StatefulWidget {
 class _AddressEntryPageState extends State<AddressEntryPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _durationController =
+      TextEditingController(text: '24');
   bool _isLoading = false;
 
   Future<void> _submitSpot() async {
@@ -832,6 +1121,7 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
           'ownerId': user.uid,
           'isAvailable': true,
           'created_at': FieldValue.serverTimestamp(),
+          'parkingDurationHours': int.tryParse(_durationController.text) ?? 24,
         });
         if (mounted) {
           Navigator.of(context).pushReplacement(
@@ -914,6 +1204,31 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _durationController,
+                        decoration: const InputDecoration(
+                          labelText: 'Parking Duration (hours)',
+                          prefixIcon: Icon(Icons.schedule_outlined),
+                          hintText: 'e.g., 24',
+                          helperText: 'How long can users park here?',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter parking duration';
+                          }
+                          final duration = int.tryParse(value);
+                          if (duration == null || duration <= 0) {
+                            return 'Please enter a valid number of hours';
+                          }
+                          if (duration > 168) {
+                            // 7 days max
+                            return 'Maximum duration is 168 hours (7 days)';
+                          }
+                          return null;
+                        },
+                      ),
                       const SizedBox(height: 32),
                       ElevatedButton(
                         onPressed: _isLoading ? null : _submitSpot,
@@ -943,7 +1258,16 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage(
+      {super.key}); // Helper method to format just time according to device settings
+  static String _formatTime(BuildContext context, DateTime dateTime) {
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
+    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
+
+    return is24HourFormat
+        ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
+        : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
+  }
 
   Future<Map<String, String>> _getUserDetails(User user) async {
     String userName = 'User'; // Default
@@ -1092,6 +1416,7 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildBookedSpotCard(
     BuildContext context, {
     required String spotId,
@@ -1167,7 +1492,8 @@ class HomePage extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                             color: Colors.orange.shade800,
                           ),
-                        ),                        const SizedBox(height: 4),
+                        ),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
                             Icon(
@@ -1611,7 +1937,8 @@ class HomePage extends StatelessWidget {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.2),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
@@ -2121,7 +2448,8 @@ class HomePage extends StatelessWidget {
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 12),                                          // Booked spots list
+                                          const SizedBox(
+                                              height: 12), // Booked spots list
                                           ...bookings.map((booking) {
                                             final data = booking.data()
                                                 as Map<String, dynamic>;
@@ -2136,30 +2464,82 @@ class HomePage extends StatelessWidget {
                                                     as Timestamp?;
                                             final timeString =
                                                 bookingTime != null
-                                                    ? bookingTime
-                                                        .toDate()
-                                                        .toLocal()
-                                                        .toString()
-                                                        .substring(11, 16)
+                                                    ? _formatTime(
+                                                        context,
+                                                        bookingTime
+                                                            .toDate()
+                                                            .toLocal())
                                                     : 'Unknown';
-                                            
-                                            // Calculate expected end time (2 hours from booking time)
-                                            final expectedEndTime = bookingTime != null
-                                                ? DateFormat('HH:mm').format(
-                                                    bookingTime.toDate().toLocal().add(const Duration(hours: 2))
-                                                  )
-                                                : 'Unknown';
 
                                             return Container(
                                               margin: const EdgeInsets.only(
                                                   bottom: 12),
-                                              child: _buildBookedSpotCard(
-                                                context,
-                                                spotId: spotId,
-                                                address: address,
-                                                timeString: timeString,
-                                                bookingId: booking.id,
-                                                expectedEndTime: expectedEndTime,
+                                              child: FutureBuilder<
+                                                  DocumentSnapshot>(
+                                                future: FirebaseFirestore
+                                                    .instance
+                                                    .collection('parking_spots')
+                                                    .doc(spotId)
+                                                    .get(),
+                                                builder:
+                                                    (context, spotSnapshot) {
+                                                  // Check if parking spot exists
+                                                  if (spotSnapshot.hasData &&
+                                                      !spotSnapshot
+                                                          .data!.exists) {
+                                                    // Parking spot doesn't exist - this is an orphaned booking
+                                                    // Clean it up asynchronously and don't display it
+
+                                                    WidgetsBinding.instance
+                                                        .addPostFrameCallback(
+                                                            (_) {
+                                                      BookingHistoryPage
+                                                          ._cleanupOrphanedBooking(
+                                                              booking.id,
+                                                              spotId);
+                                                    });
+                                                    return const SizedBox
+                                                        .shrink(); // Hide this booking from UI
+                                                  }
+
+                                                  // Default to 2 hours if spot data is not available
+                                                  int parkingDurationHours = 2;
+
+                                                  if (spotSnapshot.hasData &&
+                                                      spotSnapshot
+                                                          .data!.exists) {
+                                                    final spotData =
+                                                        spotSnapshot.data!
+                                                                .data()
+                                                            as Map<String,
+                                                                dynamic>?;
+                                                    parkingDurationHours =
+                                                        spotData?['parkingDurationHours']
+                                                                as int? ??
+                                                            24;
+                                                  } // Calculate expected end time using spot's custom duration
+                                                  final expectedEndTime =
+                                                      bookingTime != null
+                                                          ? _formatTime(
+                                                              context,
+                                                              bookingTime
+                                                                  .toDate()
+                                                                  .toLocal()
+                                                                  .add(Duration(
+                                                                      hours:
+                                                                          parkingDurationHours)))
+                                                          : 'Unknown';
+
+                                                  return _buildBookedSpotCard(
+                                                    context,
+                                                    spotId: spotId,
+                                                    address: address,
+                                                    timeString: timeString,
+                                                    bookingId: booking.id,
+                                                    expectedEndTime:
+                                                        expectedEndTime,
+                                                  );
+                                                },
                                               ),
                                             );
                                           }).toList(),
@@ -2306,248 +2686,6 @@ class QrCodePage extends StatelessWidget {
     );
   }
 }
-/*
-class BookSpotPage extends StatefulWidget {
-  const BookSpotPage({super.key});
-
-  @override
-  State<BookSpotPage> createState() => _BookSpotPageState();
-}
-
-class _BookSpotPageState extends State<BookSpotPage> {
-  bool _isLoading = false;
-  String? _error;
-  String? _selectedSpotId;
-  LatLng? _selectedLatLng;
-  String? _selectedAddress;
-
-  Future<void> _bookSpot(String spotId, String address) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() {
-        _isLoading = false;
-        _error = 'You must be logged in to book a spot.';
-      });
-      return;
-    }
-    try {
-      await FirebaseFirestore.instance
-          .collection('parking_spots')
-          .doc(spotId)
-          .update({'isAvailable': false});
-      await FirebaseFirestore.instance.collection('bookings').add({
-        'spotId': spotId,
-        'userId': user.uid,
-        'address': address,
-        'status': 'booked',
-        'bookingTime': Timestamp.now(),
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Spot booked successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to book spot: \\${e.toString()}';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Book a Parking Spot')),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFe0f7fa),
-              Color(0xFFb2ebf2),
-              Color(0xFF80deea),
-              Color(0xFF26c6da),
-            ],
-          ),
-        ),
-        child: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('parking_spots')
-              .where('isAvailable', isEqualTo: true)
-              .orderBy('created_at', descending: true)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: \\${snapshot.error}'));
-            }
-            final spots = snapshot.data?.docs ?? [];
-            if (spots.isEmpty) {
-              return const Center(
-                child: Text('No available spots at the moment.'),
-              );
-            }
-            final markers = <Marker>{};
-            for (final spot in spots) {
-              final data = spot.data() as Map<String, dynamic>;
-              final lat = (data['location']?['latitude'] as num?)?.toDouble();
-              final lng = (data['location']?['longitude'] as num?)?.toDouble();
-              final address = data['address'] as String? ?? 'No address';
-              final spotId = spot.id;
-              final ownerId = data['ownerId'] as String?;
-              final user = FirebaseAuth.instance.currentUser;
-              final isOwner = user != null && ownerId == user.uid;
-              if (lat != null && lng != null && !isOwner) {
-                markers.add(
-                  Marker(
-                    markerId: MarkerId(spotId),
-                    position: LatLng(lat, lng),
-                    infoWindow: InfoWindow(title: address),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueAzure,
-                    ),
-                    onTap: () {
-                      setState(() {
-                        _selectedSpotId = spotId;
-                        _selectedLatLng = LatLng(lat, lng);
-                        _selectedAddress = address;
-                      });
-                    },
-                  ),
-                );
-              }
-            }
-            return Stack(
-              children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: markers.isNotEmpty
-                        ? markers.first.position
-                        : const LatLng(23.7624, 90.3785),
-                    zoom: 14,
-                  ),
-                  markers: markers,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  onTap: (_) {
-                    setState(() {
-                      _selectedSpotId = null;
-                      _selectedLatLng = null;
-                      _selectedAddress = null;
-                    });
-                  },
-                ),
-                if (_selectedSpotId != null && _selectedLatLng != null)
-                  Positioned(
-                    bottom: 40,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Card(
-                        elevation: 8,
-                        color: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _selectedAddress ?? '',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Lat: \\${_selectedLatLng!.latitude.toStringAsFixed(6)}, Lng: \\${_selectedLatLng!.longitude.toStringAsFixed(6)}',
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _isLoading
-                                    ? null
-                                    : () => _bookSpot(
-                                          _selectedSpotId!,
-                                          _selectedAddress ?? '',
-                                        ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
-                                          ),
-                                        ),
-                                      )
-                                    : const Text('Confirm Booking'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                if (_error != null)
-                  Positioned(
-                    top: 40,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-*/
 
 class BookSpotPage extends StatefulWidget {
   const BookSpotPage({super.key});
