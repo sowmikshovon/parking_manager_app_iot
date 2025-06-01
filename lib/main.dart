@@ -6,12 +6,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'firebase_options.dart';
 import 'qr_pdf_util.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:intl/intl.dart';
 
 import './pages/qr_scanner_page.dart';
+import './pages/profile_page.dart';
 //import './pages/qr_code_page.dart';
 //import './pages/login_page.dart';
 //import './pages/listing_history_page.dart';
@@ -948,15 +945,14 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   Future<Map<String, String>> _getUserDetails(User user) async {
-    String userName = 'User';
-    String profileImageUrl = '';
+    String userName = 'User'; // Default
+    String profileImageUrl = ''; // Default
 
-    // Try Firebase Auth display name first
+    // Try Firebase Auth display name first if available
     if (user.displayName != null && user.displayName!.isNotEmpty) {
       userName = user.displayName!;
     }
 
-    // Fallback to Firestore for name and get profile image URL
     try {
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -964,30 +960,46 @@ class HomePage extends StatelessWidget {
           .get();
       if (userDoc.exists && userDoc.data() != null) {
         final data = userDoc.data()!;
-        if (data.containsKey('name')) {
-          userName = data['name'] ?? userName;
+
+        // Prioritize Firestore 'name' field if it exists and is not empty
+        String firestoreFullName = data['name'] as String? ?? '';
+        if (firestoreFullName.isNotEmpty) {
+          userName = firestoreFullName;
         } else {
-          final firstName = data['firstName'] as String?;
-          final lastName = data['lastName'] as String?;
-          if (firstName != null && lastName != null) {
+          // Fallback to constructing name from firstName and lastName if 'name' is not available
+          final firstName = data['firstName'] as String? ?? '';
+          final lastName = data['lastName'] as String? ?? '';
+          if (firstName.isNotEmpty && lastName.isNotEmpty) {
             userName = '$firstName $lastName'.trim();
-          } else if (firstName != null) {
+          } else if (firstName.isNotEmpty) {
             userName = firstName.trim();
-          } else if (lastName != null) {
+          } else if (lastName.isNotEmpty) {
             userName = lastName.trim();
           }
+          // If userName is still 'User' (meaning no name from auth and no specific name from Firestore fields)
+          // it will be handled by the fallback logic below.
         }
         profileImageUrl = data['profileImageUrl'] as String? ?? '';
       }
     } catch (e) {
-      // Error getting user details from Firestore
+      print('Error getting user details from Firestore: $e');
+      // In case of error, defaults or auth data (if already set to userName) will be used.
     }
 
-    // If auth display name was empty and firestore didn't provide one, ensure it's 'User'
-    if (userName.isEmpty &&
+    // Fallback to email if userName is still the generic 'User' or empty,
+    // and auth display name was also null/empty.
+    if ((userName == 'User' || userName.trim().isEmpty) &&
         (user.displayName == null || user.displayName!.isEmpty)) {
+      if (user.email != null && user.email!.contains('@')) {
+        userName = user.email!.split('@')[0];
+      }
+    }
+
+    // Final fallback to ensure userName is not empty.
+    if (userName.trim().isEmpty) {
       userName = 'User';
     }
+
     return {'userName': userName, 'profileImageUrl': profileImageUrl};
   }
 
@@ -1504,27 +1516,51 @@ class HomePage extends StatelessWidget {
           children: <Widget>[
             if (user != null)
               FutureBuilder<Map<String, String>>(
-                future: _getUserDetails(user), // Use the new method
+                future: _getUserDetails(user), // Uses the updated method
                 builder: (context, snapshot) {
-                  String userName = user.displayName ??
-                      'User'; // Default to auth display name
-                  String userEmail = user.email ?? 'No email';
-                  String profileImageUrl = '';
+                  String userName;
+                  String profileImageUrl = ''; // Default to empty
+                  String userEmail = user.email ?? 'No email provided';
 
-                  if (snapshot.connectionState == ConnectionState.done &&
-                      snapshot.hasData) {
-                    userName = snapshot.data!['userName'] ?? userName;
-                    profileImageUrl = snapshot.data!['profileImageUrl'] ?? '';
-                  } else if (snapshot.hasError) {
-                    // Keep default userName, userEmail, profileImageUrl
+                  if (snapshot.connectionState == ConnectionState.done) {
+                    if (snapshot.hasData) {
+                      // Use fetched data, fallback to auth display name or 'User'
+                      userName = snapshot.data!['userName'] ??
+                          (user.displayName ?? 'User');
+                      profileImageUrl = snapshot.data!['profileImageUrl'] ?? '';
+                    } else {
+                      // Error state: Fallback to auth display name or 'User'
+                      print(
+                          'Error fetching user details for drawer: ${snapshot.error}');
+                      userName = user.displayName ?? 'User';
+                      // profileImageUrl remains empty
+                    }
+                  } else {
+                    // Waiting state: Show auth display name or 'Loading...'
+                    // Avoid showing "Loading..." if auth name is available, provides a better UX.
+                    userName = user.displayName ?? 'Loading...';
+                    // profileImageUrl remains empty until data is loaded
                   }
-                  // If still 'User' from default and no display name, try to get from email
-                  if (userName == 'User' &&
-                      (user.displayName == null || user.displayName!.isEmpty) &&
-                      user.email != null &&
-                      user.email!.contains('@')) {
-                    userName = user.email!.split('@')[0];
+
+                  // If after all logic, userName is still generic ('User' or 'Loading...')
+                  // and auth display name was empty, try deriving from email.
+                  if ((userName == 'User' || userName == 'Loading...') &&
+                      (user.displayName == null || user.displayName!.isEmpty)) {
+                    if (user.email != null &&
+                        user.email!.isNotEmpty &&
+                        user.email!.contains('@')) {
+                      userName = user.email!.split('@')[0];
+                    } else {
+                      // If email also doesn't help, ensure it's 'User' not 'Loading...'
+                      userName = 'User';
+                    }
                   }
+
+                  // Final check to ensure userName is not empty if all else fails.
+                  if (userName.trim().isEmpty) {
+                    userName = 'User';
+                  }
+
                   return Container(
                     height: 200,
                     decoration: BoxDecoration(
@@ -1539,7 +1575,8 @@ class HomePage extends StatelessWidget {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.fromLTRB(
+                          20, 15, 20, 15), // Adjusted padding
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1555,8 +1592,7 @@ class HomePage extends StatelessWidget {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.2),
+                                      color: Colors.black.withOpacity(0.2),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
@@ -2956,441 +2992,6 @@ class _BookSpotPageState extends State<BookSpotPage> {
           },
         ),
       ),
-    );
-  }
-}
-
-// ProfilePage for user to edit their profile information
-class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
-
-  @override
-  State<ProfilePage> createState() => _ProfilePageState();
-}
-
-class _ProfilePageState extends State<ProfilePage> {
-  final _formKey = GlobalKey<FormState>();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _dateController = TextEditingController();
-
-  String _selectedGender = 'Prefer not to say';
-  final List<String> _genderOptions = [
-    'Male',
-    'Female',
-    'Other',
-    'Prefer not to say',
-  ];
-
-  DateTime? _selectedDate;
-  File? _imageFile;
-  String? _profileImageUrl;
-  bool _isLoading = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserProfile();
-  }
-
-  @override
-  void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _dateController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadUserProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // Get user data from Firestore
-        final userData = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (userData.exists) {
-          final data = userData.data()!;
-
-          // Parse the name into first and last name
-          final name = data['name'] as String? ?? '';
-          final nameParts = name.split(' ');
-          if (nameParts.isNotEmpty) {
-            _firstNameController.text = nameParts.first;
-
-            if (nameParts.length > 1) {
-              _lastNameController.text = nameParts.sublist(1).join(' ');
-            }
-          }
-
-          // Set gender if available
-          if (data['gender'] != null) {
-            setState(() {
-              _selectedGender = data['gender'];
-            });
-          }
-
-          // Set date of birth if available
-          if (data['dateOfBirth'] != null) {
-            final dob = (data['dateOfBirth'] as Timestamp).toDate();
-            setState(() {
-              _selectedDate = dob;
-              _dateController.text = DateFormat('yyyy-MM-dd').format(dob);
-            });
-          }
-
-          // Set profile image URL if available
-          if (data['profileImageUrl'] != null) {
-            setState(() {
-              _profileImageUrl = data['profileImageUrl'];
-            });
-          }
-        }
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to load profile: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedImage = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 800,
-    );
-
-    if (pickedImage != null) {
-      setState(() {
-        _imageFile = File(pickedImage.path);
-      });
-    }
-  }
-
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime(2000),
-      firstDate: DateTime(1940),
-      lastDate: DateTime.now(),
-    );
-
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _dateController.text = DateFormat('yyyy-MM-dd').format(picked);
-      });
-    }
-  }
-
-  Future<String?> _uploadImage() async {
-    if (_imageFile == null) {
-      return _profileImageUrl; // Return existing URL if no new image
-    }
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return null;
-
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images')
-          .child('${user.uid}.jpg');
-
-      await storageRef.putFile(_imageFile!);
-      return await storageRef.getDownloadURL();
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to upload image: $e';
-      });
-      return null;
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        setState(() {
-          _error = 'No user logged in';
-        });
-        return;
-      }
-
-      // Upload the image if one was selected
-      final imageUrl = await _uploadImage();
-
-      // Create user profile data
-      final userData = {
-        'name':
-            '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-        'email': user.email,
-        'gender': _selectedGender,
-        'updated_at': FieldValue.serverTimestamp(),
-      };
-
-      // Add optional fields only if they have values
-      if (_selectedDate != null) {
-        userData['dateOfBirth'] = Timestamp.fromDate(_selectedDate!);
-      }
-
-      if (imageUrl != null) {
-        userData['profileImageUrl'] = imageUrl;
-      }
-
-      // Update the user data in Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update(userData);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to update profile: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Profile Image Section
-                    GestureDetector(
-                      onTap: _pickImage,
-                      child: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 60,
-                            backgroundColor: Colors.grey[200],
-                            backgroundImage: _imageFile != null
-                                ? FileImage(_imageFile!)
-                                : _profileImageUrl != null
-                                    ? NetworkImage(_profileImageUrl!)
-                                        as ImageProvider
-                                    : null,
-                            child:
-                                (_imageFile == null && _profileImageUrl == null)
-                                    ? const Icon(
-                                        Icons.person,
-                                        size: 80,
-                                        color: Colors.grey,
-                                      )
-                                    : null,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Error Message if any
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20.0),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-
-                    // First & Last Name (side by side on larger screens)
-                    if (screenWidth > 500)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _firstNameController,
-                              decoration: const InputDecoration(
-                                labelText: 'First Name',
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'First name is required';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _lastNameController,
-                              decoration: const InputDecoration(
-                                labelText: 'Last Name',
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Last name is required';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Column(
-                        children: [
-                          TextFormField(
-                            controller: _firstNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'First Name',
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'First name is required';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _lastNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Last Name',
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Last name is required';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-
-                    const SizedBox(height: 16),
-
-                    // Date of Birth
-                    GestureDetector(
-                      onTap: _selectDate,
-                      child: AbsorbPointer(
-                        child: TextFormField(
-                          controller: _dateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Date of Birth',
-                            border: OutlineInputBorder(),
-                            suffixIcon: Icon(Icons.calendar_today),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Gender selection
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'Gender',
-                        border: OutlineInputBorder(),
-                      ),
-                      value: _selectedGender,
-                      items: _genderOptions
-                          .map(
-                            (gender) => DropdownMenuItem<String>(
-                              value: gender,
-                              child: Text(gender),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _selectedGender = value;
-                          });
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Save button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _saveProfile,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : const Text(
-                                'Save Profile',
-                                style: TextStyle(fontSize: 16),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
     );
   }
 }

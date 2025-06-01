@@ -32,11 +32,11 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _profileImageUrl;
   bool _isLoading = false;
   String? _error;
-
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
+    _testFirebaseStorageConnection();
   }
 
   @override
@@ -110,16 +110,81 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedImage = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 800,
-    );
+  Future<void> _testFirebaseStorageConnection() async {
+    try {
+      // Test Firebase Storage connection by attempting to list files
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final storageRef =
+            FirebaseStorage.instance.ref().child('profile_images');
+        await storageRef.listAll();
+        print('Firebase Storage connection successful');
+      }
+    } catch (e) {
+      print('Firebase Storage connection test failed: $e');
+      // Don't show error to user for this test, just log it
+    }
+  }
 
-    if (pickedImage != null) {
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+
+      // Show options for camera or gallery
+      final source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Select Image Source'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Gallery'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source != null) {
+        final pickedImage = await picker.pickImage(
+          source: source,
+          maxWidth: 800,
+          maxHeight: 800,
+          imageQuality: 85, // Good balance between quality and file size
+        );
+
+        if (pickedImage != null) {
+          final file = File(pickedImage.path);
+
+          // Check file size (limit to 5MB)
+          final fileSize = await file.length();
+          if (fileSize > 5 * 1024 * 1024) {
+            if (mounted) {
+              setState(() {
+                _error =
+                    'Image file is too large. Please select an image smaller than 5MB.';
+              });
+            }
+            return;
+          }
+
+          setState(() {
+            _imageFile = file;
+            _error = null; // Clear any previous errors
+          });
+        }
+      }
+    } catch (e) {
       setState(() {
-        _imageFile = File(pickedImage.path);
+        _error = 'Failed to pick image: $e';
       });
     }
   }
@@ -145,20 +210,82 @@ class _ProfilePageState extends State<ProfilePage> {
       return _profileImageUrl; // Return existing URL if no new image
     }
 
+    // Clear previous image-specific errors before attempting upload
+    setState(() {
+      _error = null;
+    });
+
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return null;
+      if (user == null) {
+        setState(() {
+          _error = 'User not logged in. Cannot upload image.';
+        });
+        return null;
+      }
 
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('profile_images')
           .child('${user.uid}.jpg');
 
-      await storageRef.putFile(_imageFile!);
-      return await storageRef.getDownloadURL();
-    } catch (e) {
+      // Optional: Add metadata
+      final metadata = SettableMetadata(contentType: 'image/jpeg');
+
+      if (!await _imageFile!.exists()) {
+        setState(() {
+          _error = 'Image file does not exist at path: ${_imageFile!.path}';
+        });
+        return null;
+      }
+      if (await _imageFile!.length() == 0) {
+        setState(() {
+          _error = 'Image file is empty.';
+        });
+        return null;
+      }
+
+      print('Attempting to upload image to: ${storageRef.fullPath}');
+      UploadTask uploadTask = storageRef.putFile(_imageFile!, metadata);
+
+      // Await the completion of the upload task
+      TaskSnapshot snapshot = await uploadTask
+          .whenComplete(() => {}); // Ensures the task is fully processed
+
+      if (snapshot.state == TaskState.success) {
+        final String downloadUrl = await snapshot.ref.getDownloadURL();
+        print('Image uploaded successfully. Download URL: $downloadUrl');
+        return downloadUrl;
+      } else {
+        // This case might not be hit if errors throw exceptions instead
+        print(
+            'Image upload failed. State: ${snapshot.state}, Bytes Transferred: ${snapshot.bytesTransferred}/${snapshot.totalBytes}');
+        setState(() {
+          _error = 'Image upload failed. State: ${snapshot.state}';
+        });
+        return null;
+      }
+    } on FirebaseException catch (e) {
+      print(
+          'Firebase Storage Exception during image upload. Code: ${e.code}. Message: ${e.message}. StackTrace: ${e.stackTrace}');
+      String displayError =
+          'Image upload failed: ${e.message ?? "Unknown Firebase error"}';
+      if (e.code == 'object-not-found') {
+        displayError =
+            'Image upload failed: The file was not found after attempting upload. Check permissions or network.';
+      } else if (e.code == 'unauthorized' || e.code == 'permission-denied') {
+        displayError =
+            'Image upload failed: Permission denied. Check Firebase Storage rules.';
+      }
       setState(() {
-        _error = 'Failed to upload image: $e';
+        _error = displayError;
+      });
+      return null;
+    } catch (e, stackTrace) {
+      print(
+          'Generic Exception during image upload: $e. StackTrace: $stackTrace');
+      setState(() {
+        _error = 'Image upload failed: An unexpected error occurred. $e';
       });
       return null;
     }
@@ -171,7 +298,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     setState(() {
       _isLoading = true;
-      _error = null;
+      _error = null; // Clear general errors before saving
     });
 
     try {
@@ -179,15 +306,40 @@ class _ProfilePageState extends State<ProfilePage> {
       if (user == null) {
         setState(() {
           _error = 'No user logged in';
+          _isLoading = false; // Ensure loading is stopped
         });
         return;
       }
 
-      // Upload the image if one was selected
-      final imageUrl = await _uploadImage();
+      String? imageUrl =
+          _profileImageUrl; // Default to existing or previously fetched URL
+
+      if (_imageFile != null) {
+        // If a new image was picked
+        imageUrl = await _uploadImage(); // Attempt to upload it
+        if (imageUrl == null) {
+          // _uploadImage already set an error and printed to console.
+          // Stop the save process if upload failed.
+          setState(() {
+            _isLoading = false;
+          });
+          if (mounted) {
+            // Check if the widget is still in the tree
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text(_error ?? 'Image upload failed. Profile not saved.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
 
       // Create user profile data
-      final userData = {
+      final userData = <String, dynamic>{
+        // Explicitly type the map
         'name':
             '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
         'email': user.email,
@@ -195,20 +347,23 @@ class _ProfilePageState extends State<ProfilePage> {
         'updated_at': FieldValue.serverTimestamp(),
       };
 
-      // Add optional fields only if they have values
       if (_selectedDate != null) {
         userData['dateOfBirth'] = Timestamp.fromDate(_selectedDate!);
       }
 
       if (imageUrl != null) {
         userData['profileImageUrl'] = imageUrl;
+      } else {
+        // If no image is set (either initially or after attempting an upload that might have cleared it),
+        // you might want to explicitly remove it from Firestore.
+        // userData['profileImageUrl'] = FieldValue.delete(); // Uncomment if you want to remove the field
       }
 
       // Update the user data in Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .update(userData);
+          .set(userData, SetOptions(merge: true)); // Use set with merge:true
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -218,7 +373,17 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         );
       }
+    } on FirebaseException catch (e) {
+      // Catch Firestore specific errors
+      print(
+          'Firestore Exception during profile save: ${e.code} - ${e.message}');
+      setState(() {
+        _error =
+            'Failed to update profile: ${e.message ?? "Unknown Firebase error"} (Code: ${e.code})';
+      });
     } catch (e) {
+      // Catch any other errors
+      print('Generic Exception during profile save: $e');
       setState(() {
         _error = 'Failed to update profile: $e';
       });

@@ -12,6 +12,9 @@ Future<void> saveQrCodeAsPdf({
 }) async {
   final pdf = pw.Document();
 
+  // Store messenger before async operations to avoid BuildContext issues
+  final scaffoldMessenger = ScaffoldMessenger.of(context);
+
   // Generate QR code as image
   final qrValidationResult = QrValidator.validate(
     data: qrData,
@@ -19,7 +22,7 @@ Future<void> saveQrCodeAsPdf({
     errorCorrectionLevel: QrErrorCorrectLevel.Q,
   );
   if (qrValidationResult.status != QrValidationStatus.valid) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    scaffoldMessenger.showSnackBar(
       const SnackBar(content: Text('Failed to generate QR code for PDF.')),
     );
     return;
@@ -39,7 +42,7 @@ Future<void> saveQrCodeAsPdf({
   );
   final image = await painter.toImageData(400);
   if (image == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    scaffoldMessenger.showSnackBar(
       const SnackBar(content: Text('Failed to render QR code image.')),
     );
     return;
