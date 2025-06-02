@@ -43,6 +43,7 @@ dependencies:
   mobile_scanner: ^3.5.6
   printing: ^5.14.2
   pdf: ^3.11.3
+  geolocator: ^10.1.0
 
 dev_dependencies:
   flutter_test:

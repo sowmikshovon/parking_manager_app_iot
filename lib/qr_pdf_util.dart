@@ -74,14 +74,16 @@ Future<void> saveQrCodeAsPdf({
                   width: 300,
                   height: 300,
                 ),
-              ),              pw.SizedBox(height: 32),
-              pw.Text('Parking Spot QR Code', 
-                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 32),
+              pw.Text('Parking Spot QR Code',
+                  style: pw.TextStyle(
+                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 16),
               pw.Text('Address: $address', style: pw.TextStyle(fontSize: 14)),
               pw.SizedBox(height: 8),
-              pw.Text('Scan this QR code to verify parking spot', 
-                style: pw.TextStyle(fontSize: 12)),
+              pw.Text('Scan this QR code to verify parking spot',
+                  style: pw.TextStyle(fontSize: 12)),
             ],
           ),
         );
@@ -90,6 +92,7 @@ Future<void> saveQrCodeAsPdf({
   );
   await Printing.layoutPdf(
     onLayout: (PdfPageFormat format) async => pdf.save(),
-    name: 'parking_spot_qr_${address.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_')}.pdf',
+    name:
+        'parking_spot_qr_${address.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_')}.pdf',
   );
 }

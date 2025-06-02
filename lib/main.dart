@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'firebase_options.dart';
 import 'package:intl/intl.dart'; // Add intl import for date formatting
 import 'qr_pdf_util.dart';
@@ -16,6 +17,62 @@ import './pages/profile_page.dart';
 //import './pages/listing_history_page.dart';
 
 // QrCodePage widget displays a QR code for a given parking spot
+
+// Location service for handling user location permissions and retrieval
+class LocationService {
+  // Request location permission and get current position
+  static Future<Position?> getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print('Location services are disabled.');
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        print('Location permissions are denied');
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      print(
+          'Location permissions are permanently denied, we cannot request permissions.');
+      return null;
+    }
+
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (e) {
+      print('Error getting current location: $e');
+      return null;
+    }
+  }
+
+  // Move camera to user location
+  static Future<void> moveToUserLocation(GoogleMapController controller) async {
+    final position = await getCurrentLocation();
+    if (position != null) {
+      await controller.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(position.latitude, position.longitude),
+            zoom: 16,
+          ),
+        ),
+      );
+    }
+  }
+}
 
 // Utility class for managing expired spot tracking
 class ExpiredSpotTracker {
@@ -1194,7 +1251,7 @@ class ListSpotPage extends StatefulWidget {
 
 class _ListSpotPageState extends State<ListSpotPage> {
   LatLng? _selectedLatLng;
-  static const LatLng _initialLatLng = LatLng(23.7624, 90.3785);
+  bool _hasMovedToUserLocation = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1203,8 +1260,8 @@ class _ListSpotPageState extends State<ListSpotPage> {
       body: Stack(
         children: [
           GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _initialLatLng,
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(0, 0), // Will be overridden by user location
               zoom: 14,
             ),
             markers: _selectedLatLng == null
@@ -1216,12 +1273,21 @@ class _ListSpotPageState extends State<ListSpotPage> {
                     ),
                   },
             onTap: (latLng) {
+              print(
+                  'ListSpotPage: User tapped at coordinates: ${latLng.latitude}, ${latLng.longitude}');
               setState(() {
                 _selectedLatLng = latLng;
               });
             },
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
+            onMapCreated: (GoogleMapController controller) async {
+              // Center on user location when map is created (only once)
+              if (!_hasMovedToUserLocation) {
+                await LocationService.moveToUserLocation(controller);
+                _hasMovedToUserLocation = true;
+              }
+            },
           ),
           if (_selectedLatLng != null)
             Positioned(
@@ -1238,6 +1304,8 @@ class _ListSpotPageState extends State<ListSpotPage> {
                     backgroundColor: Colors.teal,
                   ),
                   onPressed: () {
+                    print(
+                        'ListSpotPage: Navigating to AddressEntryPage with coordinates: ${_selectedLatLng!.latitude}, ${_selectedLatLng!.longitude}');
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) =>
@@ -1360,8 +1428,9 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
       setState(() => _isLoading = false);
       return;
     }
-
     try {
+      print(
+          'AddressEntryPage: About to store coordinates in Firestore: ${widget.selectedLatLng.latitude}, ${widget.selectedLatLng.longitude}');
       await FirebaseFirestore.instance.collection('parking_spots').add({
         'address': _addressController.text,
         'latitude': widget.selectedLatLng.latitude,
@@ -2805,11 +2874,9 @@ class _HomePageState extends State<HomePage> {
                                                     });
                                                     return const SizedBox
                                                         .shrink(); // Hide this booking from UI
-                                                  }
-
-                                                  // Default to 2 hours if spot data is not available
-                                                  int parkingDurationHours = 2;
-
+                                                  }                                                  // Calculate remaining time until availability expires
+                                                  String remainingTime =
+                                                      'Unknown';
                                                   if (spotSnapshot.hasData &&
                                                       spotSnapshot
                                                           .data!.exists) {
@@ -2818,43 +2885,38 @@ class _HomePageState extends State<HomePage> {
                                                                 .data()
                                                             as Map<String,
                                                                 dynamic>?;
-                                                    parkingDurationHours =
-                                                        spotData?['parkingDurationHours']
-                                                                as int? ??
-                                                            24;
-                                                  } // Calculate remaining time until end and handle expiration
-                                                  String remainingTime =
-                                                      'Unknown';
-                                                  if (bookingTime != null) {
-                                                    final endTime = bookingTime
-                                                        .toDate()
-                                                        .toLocal()
-                                                        .add(Duration(
-                                                            hours:
-                                                                parkingDurationHours));
-                                                    final now = DateTime.now();
-                                                    final difference =
-                                                        endTime.difference(now);
+                                                    
+                                                    // Get the availableUntil timestamp from the parking spot
+                                                    final availableUntilTimestamp = spotData?['availableUntil'] as Timestamp?;
+                                                    
+                                                    if (availableUntilTimestamp != null) {
+                                                      final availableUntil = availableUntilTimestamp.toDate().toLocal();
+                                                      final now = DateTime.now();
+                                                      final difference = availableUntil.difference(now);
 
-                                                    if (difference.isNegative) {
-                                                      // Automatically expire the booking
-                                                      _expireBooking(
-                                                          booking.id, spotId);
-                                                      return const SizedBox
-                                                          .shrink(); // Don't show expired bookings
-                                                    } else {
-                                                      final hours =
-                                                          difference.inHours;
-                                                      final minutes =
-                                                          difference.inMinutes %
-                                                              60;
-                                                      if (hours > 0) {
-                                                        remainingTime =
-                                                            '${hours}h ${minutes}m remaining';
+                                                      if (difference.isNegative) {
+                                                        // Automatically expire the booking
+                                                        _expireBooking(
+                                                            booking.id, spotId);
+                                                        return const SizedBox
+                                                            .shrink(); // Don't show expired bookings
                                                       } else {
-                                                        remainingTime =
-                                                            '${minutes}m remaining';
+                                                        final hours =
+                                                            difference.inHours;
+                                                        final minutes =
+                                                            difference.inMinutes %
+                                                                60;
+                                                        if (hours > 0) {
+                                                          remainingTime =
+                                                              '${hours}h ${minutes}m remaining';
+                                                        } else {
+                                                          remainingTime =
+                                                              '${minutes}m remaining';
+                                                        }
                                                       }
+                                                    } else {
+                                                      // No availableUntil timestamp, show as indefinite
+                                                      remainingTime = 'No time limit';
                                                     }
                                                   }
 
@@ -3030,6 +3092,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
   String? _selectedSpotId;
   LatLng? _selectedLatLng;
   String? _selectedAddress;
+  bool _hasMovedToUserLocation = false;
+  GoogleMapController? _mapController;
 
   @override
   void initState() {
@@ -3069,7 +3133,48 @@ class _BookSpotPageState extends State<BookSpotPage> {
       });
       return;
     }
+
     try {
+      // First check if the spot is still available and not expired
+      final spotDoc = await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .get();
+
+      if (!spotDoc.exists) {
+        setState(() {
+          _isLoading = false;
+          _error = 'This parking spot no longer exists.';
+        });
+        return;
+      }
+
+      final spotData = spotDoc.data() as Map<String, dynamic>;
+      final isAvailable = spotData['isAvailable'] as bool? ?? false;
+      final availableUntilTimestamp = spotData['availableUntil'] as Timestamp?;
+
+      // Check if spot is available
+      if (!isAvailable) {
+        setState(() {
+          _isLoading = false;
+          _error = 'This spot has already been booked by someone else.';
+        });
+        return;
+      }
+
+      // Check if time has expired
+      if (availableUntilTimestamp != null) {
+        final availableUntil = availableUntilTimestamp.toDate();
+        if (availableUntil.isBefore(DateTime.now())) {
+          setState(() {
+            _isLoading = false;
+            _error = 'This spot\'s availability time has expired.';
+          });
+          return;
+        }
+      }
+
+      // Proceed with booking if all checks pass
       await FirebaseFirestore.instance
           .collection('parking_spots')
           .doc(spotId)
@@ -3349,8 +3454,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
               final spotId = spot.id;
               final ownerId = data['ownerId'] as String?;
               final isOwner = user != null && ownerId == user.uid;
-
               if (lat != null && lng != null && !isOwner) {
+                print(
+                    'BookSpotPage: Creating marker for spot $spotId at coordinates: $lat, $lng');
                 markers.add(
                   Marker(
                     markerId: MarkerId(spotId),
@@ -3358,13 +3464,43 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     infoWindow: InfoWindow(title: address),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure, // Blue for available spots
-                    ),
-                    onTap: () {
-                      setState(() {
-                        _selectedSpotId = spotId;
-                        _selectedLatLng = LatLng(lat, lng);
-                        _selectedAddress = address;
-                      });
+                    ),                    onTap: () async {
+                      print(
+                          'BookSpotPage: User selected spot $spotId at coordinates: $lat, $lng');
+                      
+                      // Get current camera position before setting selection
+                      if (_mapController != null) {
+                        final currentPosition = await _mapController!.getVisibleRegion();
+                        final center = LatLng(
+                          (currentPosition.northeast.latitude + currentPosition.southwest.latitude) / 2,
+                          (currentPosition.northeast.longitude + currentPosition.southwest.longitude) / 2,
+                        );
+                        
+                        setState(() {
+                          _selectedSpotId = spotId;
+                          _selectedLatLng = LatLng(lat, lng);
+                          _selectedAddress = address;
+                        });
+                        
+                        // Delay slightly to allow setState to complete, then restore camera position
+                        await Future.delayed(const Duration(milliseconds: 50));
+                        if (_mapController != null) {
+                          await _mapController!.animateCamera(
+                            CameraUpdate.newCameraPosition(
+                              CameraPosition(
+                                target: center,
+                                zoom: await _mapController!.getZoomLevel(),
+                              ),
+                            ),
+                          );
+                        }
+                      } else {
+                        setState(() {
+                          _selectedSpotId = spotId;
+                          _selectedLatLng = LatLng(lat, lng);
+                          _selectedAddress = address;
+                        });
+                      }
                     },
                   ),
                 );
@@ -3393,39 +3529,92 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     infoWindow: InfoWindow(title: '$address (Unavailable)'),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueRed, // Red for expired spots
-                    ),
-                    onTap: () {
-                      // Show unavailable message for expired spots
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.info_outline,
-                                  color: Colors.white),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'This spot is unavailable. Please look for another one.',
-                                  style: const TextStyle(fontSize: 16),
+                    ),                    onTap: () async {
+                      // Get current camera position before clearing selection
+                      if (_mapController != null) {
+                        final currentPosition = await _mapController!.getVisibleRegion();
+                        final center = LatLng(
+                          (currentPosition.northeast.latitude + currentPosition.southwest.latitude) / 2,
+                          (currentPosition.northeast.longitude + currentPosition.southwest.longitude) / 2,
+                        );
+                        
+                        // Show unavailable message for expired spots
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(Icons.info_outline,
+                                    color: Colors.white),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'This spot is unavailable. Please look for another one.',
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
                                 ),
+                              ],
+                            ),
+                            backgroundColor: Colors.orange.shade600,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            margin: const EdgeInsets.all(16),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                        // Clear any selected spot
+                        setState(() {
+                          _selectedSpotId = null;
+                          _selectedLatLng = null;
+                          _selectedAddress = null;
+                        });
+                        
+                        // Delay slightly to allow setState to complete, then restore camera position
+                        await Future.delayed(const Duration(milliseconds: 50));
+                        if (_mapController != null) {
+                          await _mapController!.animateCamera(
+                            CameraUpdate.newCameraPosition(
+                              CameraPosition(
+                                target: center,
+                                zoom: await _mapController!.getZoomLevel(),
                               ),
-                            ],
+                            ),
+                          );
+                        }
+                      } else {
+                        // Show unavailable message for expired spots
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(Icons.info_outline,
+                                    color: Colors.white),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'This spot is unavailable. Please look for another one.',
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: Colors.orange.shade600,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            margin: const EdgeInsets.all(16),
+                            duration: const Duration(seconds: 3),
                           ),
-                          backgroundColor: Colors.orange.shade600,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                      // Clear any selected spot
-                      setState(() {
-                        _selectedSpotId = null;
-                        _selectedLatLng = null;
-                        _selectedAddress = null;
-                      });
+                        );
+                        // Clear any selected spot
+                        setState(() {
+                          _selectedSpotId = null;
+                          _selectedLatLng = null;
+                          _selectedAddress = null;
+                        });
+                      }
                     },
                   ),
                 );
@@ -3438,20 +3627,25 @@ class _BookSpotPageState extends State<BookSpotPage> {
                 child: Text('No parking spots found at the moment.'),
               );
             }
-
             if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
               return Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: markers.isNotEmpty
-                          ? markers.first.position
-                          : const LatLng(23.7624, 90.3785),
+                children: [                  GoogleMap(
+                    initialCameraPosition: const CameraPosition(
+                      target:
+                          LatLng(0, 0), // Will be overridden by user location
                       zoom: 14,
                     ),
                     markers: markers,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: true,
+                    onMapCreated: (GoogleMapController controller) async {
+                      _mapController = controller;
+                      // Center on user location when map is created (only once)
+                      if (!_hasMovedToUserLocation) {
+                        await LocationService.moveToUserLocation(controller);
+                        _hasMovedToUserLocation = true;
+                      }
+                    },
                     onTap: (_) {
                       setState(() {
                         _selectedSpotId = null;
@@ -3487,19 +3681,23 @@ class _BookSpotPageState extends State<BookSpotPage> {
                 ],
               );
             }
-
             return Stack(
-              children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: markers.isNotEmpty
-                        ? markers.first.position
-                        : const LatLng(23.7624, 90.3785),
+              children: [                GoogleMap(
+                  initialCameraPosition: const CameraPosition(
+                    target: LatLng(0, 0), // Will be overridden by user location
                     zoom: 14,
                   ),
                   markers: markers,
                   myLocationEnabled: true,
                   myLocationButtonEnabled: true,
+                  onMapCreated: (GoogleMapController controller) async {
+                    _mapController = controller;
+                    // Center on user location when map is created (only once)
+                    if (!_hasMovedToUserLocation) {
+                      await LocationService.moveToUserLocation(controller);
+                      _hasMovedToUserLocation = true;
+                    }
+                  },
                   onTap: (_) {
                     setState(() {
                       _selectedSpotId = null;
