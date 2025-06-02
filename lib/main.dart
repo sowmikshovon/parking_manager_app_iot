@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'firebase_options.dart';
 import 'package:intl/intl.dart'; // Add intl import for date formatting
 import 'qr_pdf_util.dart';
@@ -14,6 +15,79 @@ import './pages/profile_page.dart';
 //import './pages/qr_code_page.dart';
 //import './pages/login_page.dart';
 //import './pages/listing_history_page.dart';
+
+// LocationService class for handling geolocation
+class LocationService {
+  static Future<Position?> getCurrentLocation() async {
+    try {
+      print('LocationService: Starting location request...');
+      
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      print('LocationService: Location services enabled: $serviceEnabled');
+      if (!serviceEnabled) {
+        print('Location services are disabled.');
+        return null;
+      }
+
+      // Check location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      print('LocationService: Current permission status: $permission');
+      
+      if (permission == LocationPermission.denied) {
+        print('LocationService: Requesting location permission...');
+        permission = await Geolocator.requestPermission();
+        print('LocationService: Permission after request: $permission');
+        if (permission == LocationPermission.denied) {
+          print('Location permissions are denied');
+          return null;
+        }
+      }      if (permission == LocationPermission.deniedForever) {
+        print('Location permissions are permanently denied, we cannot request permissions.');
+        // For permanently denied permissions, we could open app settings
+        return null;
+      }
+
+      print('LocationService: Getting current position...');
+      // Get current position with better accuracy settings
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15), // Increased timeout
+      );
+      
+      print('Location obtained: ${position.latitude}, ${position.longitude}');
+      return position;
+    } catch (e) {
+      print('Error getting location: $e');
+      // Check if this is a specific geolocator error
+      if (e.toString().contains('No location permissions')) {
+        print('LocationService: Permissions issue detected');
+      }
+      return null;
+    }
+  }
+
+  static Future<void> moveToUserLocation(GoogleMapController controller) async {
+    try {
+      final position = await getCurrentLocation();
+      if (position != null) {
+        await controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(position.latitude, position.longitude),
+              zoom: 16,
+            ),
+          ),
+        );
+        print('Camera moved to user location');
+      } else {
+        print('Could not get user location to move camera');
+      }
+    } catch (e) {
+      print('Error moving camera to user location: $e');
+    }
+  }
+}
 
 // QrCodePage widget displays a QR code for a given parking spot
 
@@ -1044,7 +1118,8 @@ class BookingHistoryPage extends StatelessWidget {
           }
           return ListView.builder(
             itemCount: bookings.length,
-            itemBuilder: (context, index) {              final booking = bookings[index];
+            itemBuilder: (context, index) {
+              final booking = bookings[index];
               final data = booking.data() as Map<String, dynamic>;
               final spotId = data['spotId'] as String? ?? 'N/A';
               final address = data['address'] as String? ?? 'No address';
@@ -1193,62 +1268,148 @@ class ListSpotPage extends StatefulWidget {
 
 class _ListSpotPageState extends State<ListSpotPage> {
   LatLng? _selectedLatLng;
-  static const LatLng _initialLatLng = LatLng(23.7624, 90.3785);
+  GoogleMapController? _mapController; // Add map controller
+
+  Future<CameraPosition> _getInitialCameraPosition() async {
+    final position = await LocationService.getCurrentLocation();
+    if (position != null) {
+      return CameraPosition(
+        target: LatLng(position.latitude, position.longitude),
+        zoom: 14,
+      );
+    } // Fallback to default coordinates if location is not available
+    return const CameraPosition(
+      target: LatLng(23.7624, 90.3785),
+      zoom: 14,    );  }
+
+  // Method to move camera to user location
+  Future<void> _moveToUserLocation() async {
+    try {
+      if (_mapController != null) {
+        await LocationService.moveToUserLocation(_mapController!);
+      } else {
+        print('Map controller is not initialized');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Map is not ready yet. Please try again.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error in _moveToUserLocation: $e');
+      // Show user-friendly error message based on error type
+      if (mounted) {
+        String errorMessage = 'Could not get your location.';
+        
+        if (e.toString().contains('No location permissions') || 
+            e.toString().contains('permissions')) {
+          errorMessage = 'Location permission required. Please enable location access in Settings.';
+        } else if (e.toString().contains('Location services') || 
+                   e.toString().contains('disabled')) {
+          errorMessage = 'Location services are disabled. Please enable them in Settings.';
+        } else if (e.toString().contains('timeout') || 
+                   e.toString().contains('TimeoutException')) {
+          errorMessage = 'Location request timed out. Please try again.';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _moveToUserLocation(),
+            ),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Select Location')),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _initialLatLng,
-              zoom: 14,
-            ),
-            markers: _selectedLatLng == null
-                ? {}
-                : {
-                    Marker(
-                      markerId: const MarkerId('selected'),
-                      position: _selectedLatLng!,
-                    ),
-                  },
-            onTap: (latLng) {
-              setState(() {
-                _selectedLatLng = latLng;
-              });
-            },
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-          ),
-          if (_selectedLatLng != null)
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 16,
-                    ),
-                    backgroundColor: Colors.teal,
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            AddressEntryPage(selectedLatLng: _selectedLatLng!),
-                      ),
-                    );
-                  },
-                  child: const Text('Next'),
+      body: FutureBuilder<CameraPosition>(
+        future: _getInitialCameraPosition(),
+        builder: (context, cameraSnapshot) {
+          if (cameraSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final initialPosition = cameraSnapshot.data ??
+              const CameraPosition(
+                target: LatLng(23.7624, 90.3785),
+                zoom: 14,
+              );          return Stack(
+            children: [
+              GoogleMap(
+                initialCameraPosition: initialPosition,
+                markers: _selectedLatLng == null
+                    ? {}
+                    : {
+                        Marker(
+                          markerId: const MarkerId('selected'),
+                          position: _selectedLatLng!,
+                        ),
+                      },
+                onTap: (latLng) {
+                  setState(() {
+                    _selectedLatLng = latLng;
+                  });
+                },
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false, // Disable default to use custom button
+                onMapCreated: (GoogleMapController controller) async {
+                  _mapController = controller; // Store controller reference
+                },
+              ),
+              // Custom My Location button
+              Positioned(
+                top: 16,
+                right: 16,
+                child: FloatingActionButton(
+                  mini: true,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.teal,
+                  onPressed: _moveToUserLocation,
+                  tooltip: 'My Location',
+                  child: const Icon(Icons.my_location),
                 ),
               ),
-            ),
-        ],
+              if (_selectedLatLng != null)
+                Positioned(
+                  bottom: 40,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 16,
+                        ),
+                        backgroundColor: Colors.teal,
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => AddressEntryPage(
+                                selectedLatLng: _selectedLatLng!),
+                          ),
+                        );
+                      },
+                      child: const Text('Next'),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1696,6 +1857,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
   Widget _buildBookedSpotCard(
     BuildContext context, {
     required String spotId,
@@ -1791,7 +1953,8 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),                        Row(
+                        const SizedBox(height: 4),
+                        Row(
                           children: [
                             Icon(
                               Icons.schedule,
@@ -2083,7 +2246,8 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(6),
-                  ),                  child: Icon(
+                  ),
+                  child: Icon(
                     Icons.chevron_right,
                     color: Colors.grey[400],
                     size: 16,
@@ -2801,43 +2965,47 @@ class _HomePageState extends State<HomePage> {
                                                     });
                                                     return const SizedBox
                                                         .shrink(); // Hide this booking from UI
-                                                  }
-
-                                                  // Default to 2 hours if spot data is not available
-                                                  int parkingDurationHours = 2;
-
-                                                  if (spotSnapshot.hasData &&
-                                                      spotSnapshot
-                                                          .data!.exists) {
-                                                    final spotData =
-                                                        spotSnapshot.data!
-                                                                .data()
-                                                            as Map<String,
-                                                                dynamic>?;
-                                                    parkingDurationHours =
-                                                        spotData?['parkingDurationHours']
-                                                                as int? ??
-                                                            24;                                                  } // Calculate remaining time until end and handle expiration
-                                                  String remainingTime = 'Unknown';
+                                                  }                                                  // Calculate remaining time until end and handle expiration
+                                                  String remainingTime =
+                                                      'Unknown';
                                                   if (bookingTime != null) {
-                                                    final endTime = bookingTime
-                                                        .toDate()
-                                                        .toLocal()
-                                                        .add(Duration(hours: parkingDurationHours));
+                                                    DateTime? endTime;
+                                                    
+                                                    if (spotSnapshot.hasData &&
+                                                        spotSnapshot.data!.exists) {
+                                                      final spotData = spotSnapshot.data!.data() as Map<String, dynamic>?;
+                                                      final availableUntilTimestamp = spotData?['availableUntil'] as Timestamp?;
+                                                      
+                                                      if (availableUntilTimestamp != null) {
+                                                        // Use the actual availableUntil time from the parking spot
+                                                        endTime = availableUntilTimestamp.toDate().toLocal();
+                                                      }
+                                                    }
+                                                    
+                                                    // Fallback to 24 hours if no availableUntil is found
+                                                    endTime ??= bookingTime.toDate().toLocal().add(const Duration(hours: 24));
+                                                    
                                                     final now = DateTime.now();
                                                     final difference = endTime.difference(now);
-                                                    
+
                                                     if (difference.isNegative) {
                                                       // Automatically expire the booking
-                                                      _expireBooking(booking.id, spotId);
-                                                      return const SizedBox.shrink(); // Don't show expired bookings
+                                                      _expireBooking(
+                                                          booking.id, spotId);
+                                                      return const SizedBox
+                                                          .shrink(); // Don't show expired bookings
                                                     } else {
-                                                      final hours = difference.inHours;
-                                                      final minutes = difference.inMinutes % 60;
+                                                      final hours =
+                                                          difference.inHours;
+                                                      final minutes =
+                                                          difference.inMinutes %
+                                                              60;
                                                       if (hours > 0) {
-                                                        remainingTime = '${hours}h ${minutes}m remaining';
+                                                        remainingTime =
+                                                            '${hours}h ${minutes}m remaining';
                                                       } else {
-                                                        remainingTime = '${minutes}m remaining';
+                                                        remainingTime =
+                                                            '${minutes}m remaining';
                                                       }
                                                     }
                                                   }
@@ -2848,7 +3016,8 @@ class _HomePageState extends State<HomePage> {
                                                     address: address,
                                                     timeString: timeString,
                                                     bookingId: booking.id,
-                                                    expectedEndTime: remainingTime,
+                                                    expectedEndTime:
+                                                        remainingTime,
                                                   );
                                                 },
                                               ),
@@ -2946,12 +3115,13 @@ class QrCodePage extends StatelessWidget {
                   data: spotId,
                   version: QrVersions.auto,
                   size: 200.0,
-                ),                const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 16),
                 Text(
                   address,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -3012,12 +3182,86 @@ class _BookSpotPageState extends State<BookSpotPage> {
   String? _selectedSpotId;
   LatLng? _selectedLatLng;
   String? _selectedAddress;
-
+  GoogleMapController? _mapController; // Add map controller
+  
   @override
   void initState() {
     super.initState();
     // Trigger an immediate check when the page loads
     ExpiredSpotTracker.checkAndUpdateExpiredSpots();
+  }
+
+  Future<CameraPosition> _getInitialCameraPosition() async {
+    final position = await LocationService.getCurrentLocation();
+    if (position != null) {
+      return CameraPosition(
+        target: LatLng(position.latitude, position.longitude),
+        zoom: 14,
+      );
+    }
+    // Fallback to default coordinates if location is not available
+    return const CameraPosition(
+      target: LatLng(23.7624, 90.3785),
+      zoom: 14,
+    );  }
+  // Add method to move camera to selected spot
+  Future<void> _moveCameraToSpot(LatLng spotLocation) async {
+    if (_mapController != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: spotLocation,
+            zoom: 16, // Zoom in closer to the selected spot
+          ),
+        ),
+      );    }  }
+
+  // Method to move camera to user location
+  Future<void> _moveToUserLocation() async {
+    try {
+      if (_mapController != null) {
+        await LocationService.moveToUserLocation(_mapController!);
+      } else {
+        print('Map controller is not initialized');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Map is not ready yet. Please try again.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error in _moveToUserLocation: $e');
+      // Show user-friendly error message based on error type
+      if (mounted) {
+        String errorMessage = 'Could not get your location.';
+        
+        if (e.toString().contains('No location permissions') || 
+            e.toString().contains('permissions')) {
+          errorMessage = 'Location permission required. Please enable location access in Settings.';
+        } else if (e.toString().contains('Location services') || 
+                   e.toString().contains('disabled')) {
+          errorMessage = 'Location services are disabled. Please enable them in Settings.';
+        } else if (e.toString().contains('timeout') || 
+                   e.toString().contains('TimeoutException')) {
+          errorMessage = 'Location request timed out. Please try again.';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _moveToUserLocation(),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<String> _getUserName(User user) async {
@@ -3271,7 +3515,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
               Color(0xFF26c6da),
             ],
           ),
-        ),        child: StreamBuilder<QuerySnapshot>(
+        ),
+        child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('parking_spots')
               .orderBy('created_at', descending: true)
@@ -3282,17 +3527,20 @@ class _BookSpotPageState extends State<BookSpotPage> {
             }
             if (snapshot.hasError) {
               return Center(child: Text('Error: \\${snapshot.error}'));
-            }            final spots = snapshot.data?.docs ?? [];
+            }
+            final spots = snapshot.data?.docs ?? [];
 
             // Separate spots into available and expired
             final availableSpots = <QueryDocumentSnapshot>[];
             final expiredSpots = <QueryDocumentSnapshot>[];
-            
+
             for (final spot in spots) {
               final data = spot.data() as Map<String, dynamic>;
-              final availableUntilTimestamp = data['availableUntil'] as Timestamp?;
-              final isCurrentlyAvailable = data['isAvailable'] as bool? ?? false;
-              
+              final availableUntilTimestamp =
+                  data['availableUntil'] as Timestamp?;
+              final isCurrentlyAvailable =
+                  data['isAvailable'] as bool? ?? false;
+
               if (availableUntilTimestamp == null) {
                 // No time restriction, check isAvailable flag
                 if (isCurrentlyAvailable) {
@@ -3302,7 +3550,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
                 }
               } else {
                 final availableUntil = availableUntilTimestamp.toDate();
-                if (availableUntil.isAfter(DateTime.now()) && isCurrentlyAvailable) {
+                if (availableUntil.isAfter(DateTime.now()) &&
+                    isCurrentlyAvailable) {
                   availableSpots.add(spot);
                 } else {
                   expiredSpots.add(spot);
@@ -3312,20 +3561,21 @@ class _BookSpotPageState extends State<BookSpotPage> {
 
             final markers = <Marker>{};
             final user = FirebaseAuth.instance.currentUser;
-            
+
             // Add available spots with blue markers
             for (final spot in availableSpots) {
               final data = spot.data() as Map<String, dynamic>;
               // Check for both old nested format and new direct format
-              final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 
-                         (data['latitude'] as num?)?.toDouble();
-              final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 
-                         (data['longitude'] as num?)?.toDouble();
+              final lat = (data['location']?['latitude'] as num?)?.toDouble() ??
+                  (data['latitude'] as num?)?.toDouble();
+              final lng =
+                  (data['location']?['longitude'] as num?)?.toDouble() ??
+                      (data['longitude'] as num?)?.toDouble();
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
               final ownerId = data['ownerId'] as String?;
               final isOwner = user != null && ownerId == user.uid;
-              
+
               if (lat != null && lng != null && !isOwner) {
                 markers.add(
                   Marker(
@@ -3334,32 +3584,35 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     infoWindow: InfoWindow(title: address),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure, // Blue for available spots
-                    ),
-                    onTap: () {
+                    ),                    onTap: () {
+                      final spotLocation = LatLng(lat, lng);
                       setState(() {
                         _selectedSpotId = spotId;
-                        _selectedLatLng = LatLng(lat, lng);
+                        _selectedLatLng = spotLocation;
                         _selectedAddress = address;
                       });
+                      // Move camera to center on the selected spot
+                      _moveCameraToSpot(spotLocation);
                     },
                   ),
                 );
               }
             }
-            
+
             // Add expired spots with red markers
             for (final spot in expiredSpots) {
               final data = spot.data() as Map<String, dynamic>;
               // Check for both old nested format and new direct format
-              final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 
-                         (data['latitude'] as num?)?.toDouble();
-              final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 
-                         (data['longitude'] as num?)?.toDouble();
+              final lat = (data['location']?['latitude'] as num?)?.toDouble() ??
+                  (data['latitude'] as num?)?.toDouble();
+              final lng =
+                  (data['location']?['longitude'] as num?)?.toDouble() ??
+                      (data['longitude'] as num?)?.toDouble();
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
               final ownerId = data['ownerId'] as String?;
               final isOwner = user != null && ownerId == user.uid;
-              
+
               if (lat != null && lng != null && !isOwner) {
                 markers.add(
                   Marker(
@@ -3375,7 +3628,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
                         SnackBar(
                           content: Row(
                             children: [
-                              const Icon(Icons.info_outline, color: Colors.white),
+                              const Icon(Icons.info_outline,
+                                  color: Colors.white),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
@@ -3411,251 +3665,304 @@ class _BookSpotPageState extends State<BookSpotPage> {
               return const Center(
                 child: Text('No parking spots found at the moment.'),
               );
-            }
-            
-            if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
-              return Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: markers.isNotEmpty
-                          ? markers.first.position
-                          : const LatLng(23.7624, 90.3785),
-                      zoom: 14,
-                    ),
-                    markers: markers,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    onTap: (_) {
-                      setState(() {
-                        _selectedSpotId = null;
-                        _selectedLatLng = null;
-                        _selectedAddress = null;
-                      });
-                    },
-                  ),
-                  Positioned(
-                    top: 100,
-                    left: 16,
-                    right: 16,
-                    child: Card(
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Colors.orange.shade600),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Text(
-                                'No available spots at the moment. Red markers show unavailable spots.',
-                                style: TextStyle(fontSize: 14),
-                              ),
+            }            if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
+              return FutureBuilder<CameraPosition>(
+                future: _getInitialCameraPosition(),
+                builder: (context, cameraSnapshot) {
+                  if (cameraSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final initialPosition = cameraSnapshot.data ??
+                      const CameraPosition(
+                        target: LatLng(23.7624, 90.3785),
+                        zoom: 14,
+                      );                  return Stack(
+                    children: [
+                      GoogleMap(
+                        initialCameraPosition: initialPosition,
+                        markers: markers,
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: false, // Disable default to use custom button
+                        onMapCreated: (GoogleMapController controller) async {
+                          _mapController = controller;
+                        },
+                        onTap: (_) {
+                          setState(() {
+                            _selectedSpotId = null;
+                            _selectedLatLng = null;
+                            _selectedAddress = null;
+                          });
+                        },
+                      ),
+                      // Custom My Location button
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: FloatingActionButton(
+                          mini: true,
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.teal,
+                          onPressed: _moveToUserLocation,
+                          tooltip: 'My Location',
+                          child: const Icon(Icons.my_location),
+                        ),
+                      ),
+                      Positioned(
+                        top: 100,
+                        left: 16,
+                        right: 16,
+                        child: Card(
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline,
+                                    color: Colors.orange.shade600),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Text(
+                                    'No available spots at the moment. Red markers show unavailable spots.',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
+                    ],
+                  );
+                },
+              );
+            }            return FutureBuilder<CameraPosition>(
+              future: _getInitialCameraPosition(),
+              builder: (context, cameraSnapshot) {
+                if (cameraSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final initialPosition = cameraSnapshot.data ??
+                    const CameraPosition(
+                      target: LatLng(23.7624, 90.3785),
+                      zoom: 14,
+                    );                return Stack(
+                  children: [
+                    GoogleMap(
+                      initialCameraPosition: initialPosition,
+                      markers: markers,
+                      myLocationEnabled: true,
+                      myLocationButtonEnabled: false, // Disable default to use custom button
+                      onMapCreated: (GoogleMapController controller) async {
+                        _mapController = controller;
+                      },
+                      onTap: (_) {
+                        setState(() {
+                          _selectedSpotId = null;
+                          _selectedLatLng = null;
+                          _selectedAddress = null;
+                        });
+                      },
                     ),
-                  ),
-                ],
-              );            }
-            
-            return Stack(
-              children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: markers.isNotEmpty
-                        ? markers.first.position
-                        : const LatLng(23.7624, 90.3785),
-                    zoom: 14,
-                  ),
-                  markers: markers,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,                  onTap: (_) {
-                    setState(() {
-                      _selectedSpotId = null;
-                      _selectedLatLng = null;
-                      _selectedAddress = null;
-                    });
-                  },
-                ),
-                // Legend for marker colors
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Card(
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  color: Colors.blue,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Text('Available', style: TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Text('Unavailable', style: TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                        ],
+                    // Custom My Location button
+                    Positioned(
+                      top: 16,
+                      right: 16,
+                      child: FloatingActionButton(
+                        mini: true,
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.teal,
+                        onPressed: _moveToUserLocation,
+                        tooltip: 'My Location',
+                        child: const Icon(Icons.my_location),
                       ),
                     ),
-                  ),
-                ),
-                if (_selectedSpotId != null && _selectedLatLng != null)
-                  Positioned(
-                    bottom: 40,
-                    left: 0,
-                    right: 0,
-                    child: Center(
+                    // Legend for marker colors
+                    Positioned(
+                      top: 16,
+                      left: 16,
                       child: Card(
-                        elevation: 8,
-                        color: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        elevation: 4,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
+                          padding: const EdgeInsets.all(12),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                _selectedAddress ?? '',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Lat: \\${_selectedLatLng!.latitude.toStringAsFixed(6)}, Lng: \\${_selectedLatLng!.longitude.toStringAsFixed(6)}',
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              const SizedBox(height: 16),
-                              // QR Scanner Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: _isLoading
-                                      ? null
-                                      : () => _openQrScanner(),
-                                  icon: const Icon(Icons.qr_code_scanner),
-                                  label: const Text('Scan QR Code'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal[600],
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    elevation: 4,
                                   ),
-                                ),
+                                  const SizedBox(width: 6),
+                                  const Text('Available',
+                                      style: TextStyle(fontSize: 12)),
+                                ],
                               ),
-                              const SizedBox(height: 12),
-                              // Regular Confirm Booking Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading
-                                      ? null
-                                      : () => _bookSpot(
-                                            _selectedSpotId!,
-                                            _selectedAddress ?? '',
-                                          ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange[700],
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    elevation: 2,
                                   ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
-                                            ),
-                                          ),
-                                        )
-                                      : const Text(
-                                          'Book without QR Scan',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                ),
+                                  const SizedBox(width: 6),
+                                  const Text('Unavailable',
+                                      style: TextStyle(fontSize: 12)),
+                                ],
                               ),
                             ],
                           ),
                         ),
                       ),
                     ),
-                  ),
-                if (_error != null)
-                  Positioned(
-                    top: 40,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
+                    if (_selectedSpotId != null && _selectedLatLng != null)
+                      Positioned(
+                        bottom: 40,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Card(
+                            elevation: 8,
+                            color: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _selectedAddress ?? '',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Lat: \\${_selectedLatLng!.latitude.toStringAsFixed(6)}, Lng: \\${_selectedLatLng!.longitude.toStringAsFixed(6)}',
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // QR Scanner Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _isLoading
+                                          ? null
+                                          : () => _openQrScanner(),
+                                      icon: const Icon(Icons.qr_code_scanner),
+                                      label: const Text('Scan QR Code'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.teal[600],
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 4,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // Regular Confirm Booking Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading
+                                          ? null
+                                          : () => _bookSpot(
+                                                _selectedSpotId!,
+                                                _selectedAddress ?? '',
+                                              ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange[700],
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 2,
+                                      ),
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                        Color>(
+                                                  Colors.white,
+                                                ),
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Book without QR Scan',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
+                    if (_error != null)
+                      Positioned(
+                        top: 40,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             );
           },
         ),
