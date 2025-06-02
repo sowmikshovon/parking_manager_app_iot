@@ -1044,8 +1044,7 @@ class BookingHistoryPage extends StatelessWidget {
           }
           return ListView.builder(
             itemCount: bookings.length,
-            itemBuilder: (context, index) {
-              final booking = bookings[index];
+            itemBuilder: (context, index) {              final booking = bookings[index];
               final data = booking.data() as Map<String, dynamic>;
               final spotId = data['spotId'] as String? ?? 'N/A';
               final address = data['address'] as String? ?? 'No address';
@@ -1697,7 +1696,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
   Widget _buildBookedSpotCard(
     BuildContext context, {
     required String spotId,
@@ -1793,8 +1791,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Row(
+                        const SizedBox(height: 4),                        Row(
                           children: [
                             Icon(
                               Icons.schedule,
@@ -2086,8 +2083,7 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
+                  ),                  child: Icon(
                     Icons.chevron_right,
                     color: Colors.grey[400],
                     size: 16,
@@ -2821,39 +2817,27 @@ class _HomePageState extends State<HomePage> {
                                                     parkingDurationHours =
                                                         spotData?['parkingDurationHours']
                                                                 as int? ??
-                                                            24;
-                                                  } // Calculate remaining time until end and handle expiration
-                                                  String remainingTime =
-                                                      'Unknown';
+                                                            24;                                                  } // Calculate remaining time until end and handle expiration
+                                                  String remainingTime = 'Unknown';
                                                   if (bookingTime != null) {
                                                     final endTime = bookingTime
                                                         .toDate()
                                                         .toLocal()
-                                                        .add(Duration(
-                                                            hours:
-                                                                parkingDurationHours));
+                                                        .add(Duration(hours: parkingDurationHours));
                                                     final now = DateTime.now();
-                                                    final difference =
-                                                        endTime.difference(now);
-
+                                                    final difference = endTime.difference(now);
+                                                    
                                                     if (difference.isNegative) {
                                                       // Automatically expire the booking
-                                                      _expireBooking(
-                                                          booking.id, spotId);
-                                                      return const SizedBox
-                                                          .shrink(); // Don't show expired bookings
+                                                      _expireBooking(booking.id, spotId);
+                                                      return const SizedBox.shrink(); // Don't show expired bookings
                                                     } else {
-                                                      final hours =
-                                                          difference.inHours;
-                                                      final minutes =
-                                                          difference.inMinutes %
-                                                              60;
+                                                      final hours = difference.inHours;
+                                                      final minutes = difference.inMinutes % 60;
                                                       if (hours > 0) {
-                                                        remainingTime =
-                                                            '${hours}h ${minutes}m remaining';
+                                                        remainingTime = '${hours}h ${minutes}m remaining';
                                                       } else {
-                                                        remainingTime =
-                                                            '${minutes}m remaining';
+                                                        remainingTime = '${minutes}m remaining';
                                                       }
                                                     }
                                                   }
@@ -2864,8 +2848,7 @@ class _HomePageState extends State<HomePage> {
                                                     address: address,
                                                     timeString: timeString,
                                                     bookingId: booking.id,
-                                                    expectedEndTime:
-                                                        remainingTime,
+                                                    expectedEndTime: remainingTime,
                                                   );
                                                 },
                                               ),
@@ -2963,13 +2946,12 @@ class QrCodePage extends StatelessWidget {
                   data: spotId,
                   version: QrVersions.auto,
                   size: 200.0,
-                ),
-                const SizedBox(height: 16),
+                ),                const SizedBox(height: 16),
                 Text(
                   address,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -3289,8 +3271,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
               Color(0xFF26c6da),
             ],
           ),
-        ),
-        child: StreamBuilder<QuerySnapshot>(
+        ),        child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('parking_spots')
               .orderBy('created_at', descending: true)
@@ -3301,20 +3282,17 @@ class _BookSpotPageState extends State<BookSpotPage> {
             }
             if (snapshot.hasError) {
               return Center(child: Text('Error: \\${snapshot.error}'));
-            }
-            final spots = snapshot.data?.docs ?? [];
+            }            final spots = snapshot.data?.docs ?? [];
 
             // Separate spots into available and expired
             final availableSpots = <QueryDocumentSnapshot>[];
             final expiredSpots = <QueryDocumentSnapshot>[];
-
+            
             for (final spot in spots) {
               final data = spot.data() as Map<String, dynamic>;
-              final availableUntilTimestamp =
-                  data['availableUntil'] as Timestamp?;
-              final isCurrentlyAvailable =
-                  data['isAvailable'] as bool? ?? false;
-
+              final availableUntilTimestamp = data['availableUntil'] as Timestamp?;
+              final isCurrentlyAvailable = data['isAvailable'] as bool? ?? false;
+              
               if (availableUntilTimestamp == null) {
                 // No time restriction, check isAvailable flag
                 if (isCurrentlyAvailable) {
@@ -3324,8 +3302,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                 }
               } else {
                 final availableUntil = availableUntilTimestamp.toDate();
-                if (availableUntil.isAfter(DateTime.now()) &&
-                    isCurrentlyAvailable) {
+                if (availableUntil.isAfter(DateTime.now()) && isCurrentlyAvailable) {
                   availableSpots.add(spot);
                 } else {
                   expiredSpots.add(spot);
@@ -3335,21 +3312,20 @@ class _BookSpotPageState extends State<BookSpotPage> {
 
             final markers = <Marker>{};
             final user = FirebaseAuth.instance.currentUser;
-
+            
             // Add available spots with blue markers
             for (final spot in availableSpots) {
               final data = spot.data() as Map<String, dynamic>;
               // Check for both old nested format and new direct format
-              final lat = (data['location']?['latitude'] as num?)?.toDouble() ??
-                  (data['latitude'] as num?)?.toDouble();
-              final lng =
-                  (data['location']?['longitude'] as num?)?.toDouble() ??
-                      (data['longitude'] as num?)?.toDouble();
+              final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 
+                         (data['latitude'] as num?)?.toDouble();
+              final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 
+                         (data['longitude'] as num?)?.toDouble();
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
               final ownerId = data['ownerId'] as String?;
               final isOwner = user != null && ownerId == user.uid;
-
+              
               if (lat != null && lng != null && !isOwner) {
                 markers.add(
                   Marker(
@@ -3370,21 +3346,20 @@ class _BookSpotPageState extends State<BookSpotPage> {
                 );
               }
             }
-
+            
             // Add expired spots with red markers
             for (final spot in expiredSpots) {
               final data = spot.data() as Map<String, dynamic>;
               // Check for both old nested format and new direct format
-              final lat = (data['location']?['latitude'] as num?)?.toDouble() ??
-                  (data['latitude'] as num?)?.toDouble();
-              final lng =
-                  (data['location']?['longitude'] as num?)?.toDouble() ??
-                      (data['longitude'] as num?)?.toDouble();
+              final lat = (data['location']?['latitude'] as num?)?.toDouble() ?? 
+                         (data['latitude'] as num?)?.toDouble();
+              final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 
+                         (data['longitude'] as num?)?.toDouble();
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
               final ownerId = data['ownerId'] as String?;
               final isOwner = user != null && ownerId == user.uid;
-
+              
               if (lat != null && lng != null && !isOwner) {
                 markers.add(
                   Marker(
@@ -3400,8 +3375,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                         SnackBar(
                           content: Row(
                             children: [
-                              const Icon(Icons.info_outline,
-                                  color: Colors.white),
+                              const Icon(Icons.info_outline, color: Colors.white),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
@@ -3438,7 +3412,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                 child: Text('No parking spots found at the moment.'),
               );
             }
-
+            
             if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
               return Stack(
                 children: [
@@ -3470,8 +3444,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline,
-                                color: Colors.orange.shade600),
+                            Icon(Icons.info_outline, color: Colors.orange.shade600),
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Text(
@@ -3485,9 +3458,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     ),
                   ),
                 ],
-              );
-            }
-
+              );            }
+            
             return Stack(
               children: [
                 GoogleMap(
@@ -3499,8 +3471,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                   ),
                   markers: markers,
                   myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  onTap: (_) {
+                  myLocationButtonEnabled: true,                  onTap: (_) {
                     setState(() {
                       _selectedSpotId = null;
                       _selectedLatLng = null;
@@ -3531,8 +3502,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text('Available',
-                                  style: TextStyle(fontSize: 12)),
+                              const Text('Available', style: TextStyle(fontSize: 12)),
                             ],
                           ),
                           const SizedBox(height: 4),
@@ -3548,8 +3518,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text('Unavailable',
-                                  style: TextStyle(fontSize: 12)),
+                              const Text('Unavailable', style: TextStyle(fontSize: 12)),
                             ],
                           ),
                         ],
