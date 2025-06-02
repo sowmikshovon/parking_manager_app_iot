@@ -2874,7 +2874,7 @@ class _HomePageState extends State<HomePage> {
                                                     });
                                                     return const SizedBox
                                                         .shrink(); // Hide this booking from UI
-                                                  } // Calculate remaining time until availability expires
+                                                  }                                                  // Calculate remaining time until availability expires
                                                   String remainingTime =
                                                       'Unknown';
                                                   if (spotSnapshot.hasData &&
@@ -2885,27 +2885,16 @@ class _HomePageState extends State<HomePage> {
                                                                 .data()
                                                             as Map<String,
                                                                 dynamic>?;
-
+                                                    
                                                     // Get the availableUntil timestamp from the parking spot
-                                                    final availableUntilTimestamp =
-                                                        spotData?[
-                                                                'availableUntil']
-                                                            as Timestamp?;
+                                                    final availableUntilTimestamp = spotData?['availableUntil'] as Timestamp?;
+                                                    
+                                                    if (availableUntilTimestamp != null) {
+                                                      final availableUntil = availableUntilTimestamp.toDate().toLocal();
+                                                      final now = DateTime.now();
+                                                      final difference = availableUntil.difference(now);
 
-                                                    if (availableUntilTimestamp !=
-                                                        null) {
-                                                      final availableUntil =
-                                                          availableUntilTimestamp
-                                                              .toDate()
-                                                              .toLocal();
-                                                      final now =
-                                                          DateTime.now();
-                                                      final difference =
-                                                          availableUntil
-                                                              .difference(now);
-
-                                                      if (difference
-                                                          .isNegative) {
+                                                      if (difference.isNegative) {
                                                         // Automatically expire the booking
                                                         _expireBooking(
                                                             booking.id, spotId);
@@ -2915,8 +2904,7 @@ class _HomePageState extends State<HomePage> {
                                                         final hours =
                                                             difference.inHours;
                                                         final minutes =
-                                                            difference
-                                                                    .inMinutes %
+                                                            difference.inMinutes %
                                                                 60;
                                                         if (hours > 0) {
                                                           remainingTime =
@@ -2928,8 +2916,7 @@ class _HomePageState extends State<HomePage> {
                                                       }
                                                     } else {
                                                       // No availableUntil timestamp, show as indefinite
-                                                      remainingTime =
-                                                          'No time limit';
+                                                      remainingTime = 'No time limit';
                                                     }
                                                   }
 
@@ -3477,30 +3464,24 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     infoWindow: InfoWindow(title: address),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure, // Blue for available spots
-                    ),
-                    onTap: () async {
+                    ),                    onTap: () async {
                       print(
                           'BookSpotPage: User selected spot $spotId at coordinates: $lat, $lng');
-
+                      
                       // Get current camera position before setting selection
                       if (_mapController != null) {
-                        final currentPosition =
-                            await _mapController!.getVisibleRegion();
+                        final currentPosition = await _mapController!.getVisibleRegion();
                         final center = LatLng(
-                          (currentPosition.northeast.latitude +
-                                  currentPosition.southwest.latitude) /
-                              2,
-                          (currentPosition.northeast.longitude +
-                                  currentPosition.southwest.longitude) /
-                              2,
+                          (currentPosition.northeast.latitude + currentPosition.southwest.latitude) / 2,
+                          (currentPosition.northeast.longitude + currentPosition.southwest.longitude) / 2,
                         );
-
+                        
                         setState(() {
                           _selectedSpotId = spotId;
                           _selectedLatLng = LatLng(lat, lng);
                           _selectedAddress = address;
                         });
-
+                        
                         // Delay slightly to allow setState to complete, then restore camera position
                         await Future.delayed(const Duration(milliseconds: 50));
                         if (_mapController != null) {
@@ -3548,21 +3529,15 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     infoWindow: InfoWindow(title: '$address (Unavailable)'),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueRed, // Red for expired spots
-                    ),
-                    onTap: () async {
+                    ),                    onTap: () async {
                       // Get current camera position before clearing selection
                       if (_mapController != null) {
-                        final currentPosition =
-                            await _mapController!.getVisibleRegion();
+                        final currentPosition = await _mapController!.getVisibleRegion();
                         final center = LatLng(
-                          (currentPosition.northeast.latitude +
-                                  currentPosition.southwest.latitude) /
-                              2,
-                          (currentPosition.northeast.longitude +
-                                  currentPosition.southwest.longitude) /
-                              2,
+                          (currentPosition.northeast.latitude + currentPosition.southwest.latitude) / 2,
+                          (currentPosition.northeast.longitude + currentPosition.southwest.longitude) / 2,
                         );
-
+                        
                         // Show unavailable message for expired spots
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -3594,7 +3569,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                           _selectedLatLng = null;
                           _selectedAddress = null;
                         });
-
+                        
                         // Delay slightly to allow setState to complete, then restore camera position
                         await Future.delayed(const Duration(milliseconds: 50));
                         if (_mapController != null) {
@@ -3654,8 +3629,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
             }
             if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
               return Stack(
-                children: [
-                  GoogleMap(
+                children: [                  GoogleMap(
                     initialCameraPosition: const CameraPosition(
                       target:
                           LatLng(0, 0), // Will be overridden by user location
@@ -3708,8 +3682,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
               );
             }
             return Stack(
-              children: [
-                GoogleMap(
+              children: [                GoogleMap(
                   initialCameraPosition: const CameraPosition(
                     target: LatLng(0, 0), // Will be overridden by user location
                     zoom: 14,
