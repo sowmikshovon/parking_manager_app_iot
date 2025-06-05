@@ -251,17 +251,33 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _error;
-  bool _obscurePassword = true;
+  bool _obscurePassword = true;  Future<void> _signIn() async {
+    // Validate empty fields before attempting authentication
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    
+    if (email.isEmpty) {
+      setState(() {
+        _error = "Please enter your email address.";
+      });
+      return;
+    }
+    
+    if (password.isEmpty) {
+      setState(() {
+        _error = "Please enter your password.";
+      });
+      return;
+    }
 
-  Future<void> _signIn() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -271,7 +287,35 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _error = e.message ?? "An unknown error occurred.";
+        switch (e.code) {
+          case 'wrong-password':
+            _error = "The password you entered is incorrect. Please try again.";
+            break;
+          case 'user-not-found':
+            _error = "No account found with this email address. Please check your email or sign up.";
+            break;
+          case 'invalid-email':
+            _error = "The email address is not valid. Please enter a valid email.";
+            break;
+          case 'user-disabled':
+            _error = "This account has been disabled. Please contact support.";
+            break;
+          case 'too-many-requests':
+            _error = "Too many failed login attempts. Please try again later.";
+            break;
+          case 'invalid-credential':
+            _error = "Invalid email or password. Please check your credentials and try again.";
+            break;
+          case 'network-request-failed':
+            _error = "Network error. Please check your internet connection and try again.";
+            break;
+          default:
+            _error = e.message ?? "Login failed. Please try again.";
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _error = "An unexpected error occurred. Please try again.";
       });
     } finally {
       if (mounted) {
@@ -485,14 +529,31 @@ class _SignUpPageState extends State<SignUpPage> {
             backgroundColor: Colors.green,
           ),
         );
-      }
-    } on FirebaseAuthException catch (e) {
+      }    } on FirebaseAuthException catch (e) {
       setState(() {
-        if (e.code == 'email-already-in-use') {
-          _error = 'This email address is already in use.';
-        } else {
-          _error = e.message ?? 'An unknown error occurred.';
+        switch (e.code) {
+          case 'email-already-in-use':
+            _error = 'This email address is already registered. Please use a different email or try logging in.';
+            break;
+          case 'weak-password':
+            _error = 'The password is too weak. Please choose a stronger password.';
+            break;
+          case 'invalid-email':
+            _error = 'The email address is not valid. Please enter a valid email.';
+            break;
+          case 'operation-not-allowed':
+            _error = 'Email/password accounts are not enabled. Please contact support.';
+            break;
+          case 'network-request-failed':
+            _error = 'Network error. Please check your internet connection and try again.';
+            break;
+          default:
+            _error = e.message ?? 'Sign up failed. Please try again.';
         }
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'An unexpected error occurred. Please try again.';
       });
     } finally {
       if (mounted) {
@@ -650,9 +711,7 @@ class ListingHistoryPage extends StatelessWidget {
               final data = spot.data() as Map<String, dynamic>;
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
-              final isAvailable = data['isAvailable'] == true;
-
-              // Check availability status based on time
+              final isAvailable = data['isAvailable'] == true;              // Check availability status based on time
               final availableUntilTimestamp =
                   data['availableUntil'] as Timestamp?;
               final DateTime? availableUntil =
@@ -660,11 +719,15 @@ class ListingHistoryPage extends StatelessWidget {
               final bool isTimeExpired = availableUntil != null &&
                   availableUntil.isBefore(DateTime.now());
 
+              // Default status
               String statusText = 'Available';
               Color statusColor = Colors.green;
+              
               if (!isAvailable) {
-                statusText = 'Booked';
-                statusColor = Colors.orange;
+                // Need to check if it's actually booked or just expired
+                // This will be handled by the StreamBuilder below
+                statusText = 'Checking...';
+                statusColor = Colors.grey;
               } else if (isTimeExpired) {
                 statusText = 'Time Finished';
                 statusColor = Colors.red;
@@ -676,17 +739,59 @@ class ListingHistoryPage extends StatelessWidget {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Spot ID: $spotId'),
-                      Row(
+                      Text('Spot ID: $spotId'),                      Row(
                         children: [
                           Text('Status: '),
-                          Text(
-                            statusText,
-                            style: TextStyle(
-                              color: statusColor,
-                              fontWeight: FontWeight.bold,
+                          if (!isAvailable)
+                            // Use StreamBuilder to check for active bookings
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('bookings')
+                                  .where('spotId', isEqualTo: spotId)
+                                  .where('status', isEqualTo: 'active')
+                                  .limit(1)
+                                  .snapshots(),
+                              builder: (context, bookingSnapshot) {
+                                if (bookingSnapshot.connectionState == ConnectionState.waiting) {
+                                  return Text(
+                                    'Checking...',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                }
+                                
+                                final hasActiveBooking = bookingSnapshot.hasData && 
+                                    bookingSnapshot.data!.docs.isNotEmpty;
+                                
+                                if (hasActiveBooking) {
+                                  return Text(
+                                    'Booked',
+                                    style: TextStyle(
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                } else {
+                                  return Text(
+                                    'Expired',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                }
+                              },
+                            )
+                          else
+                            Text(
+                              statusText,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                       if (availableUntil != null)
@@ -1036,6 +1141,7 @@ class ListingHistoryPage extends StatelessWidget {
 
 class BookingHistoryPage extends StatelessWidget {
   const BookingHistoryPage({super.key});
+
   // Helper method to format date and time according to device settings
   static String _formatDateTime(BuildContext context, DateTime dateTime) {
     final MediaQueryData mediaQuery = MediaQuery.of(context);
@@ -1047,19 +1153,91 @@ class BookingHistoryPage extends StatelessWidget {
         : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
     return '$date $time';
   }
+  // Method to open QR scanner for booked spots in booking history
+  static void _openQrScannerForBookingHistory(BuildContext context, String spotId, String address, String bookingId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => QrScannerPage(
+          expectedSpotId: spotId,
+          address: address,
+          onSuccess: () {
+            // Show success message when QR is successfully scanned
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('QR Code verified successfully!'),
+                  ],
+                ),
+                backgroundColor: Colors.green[600],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          },
+          onSkip: () {
+            // Show message when user skips QR scanning
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('QR scanning skipped'),
+                  ],
+                ),
+                backgroundColor: Colors.orange[600],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
-  // Helper method to check if parking spot exists and clean up orphaned bookings
-  static Future<void> _cleanupOrphanedBooking(
-      String bookingId, String spotId) async {
+  // Method to end parking from booking history
+  static Future<void> _endParkingFromHistory(BuildContext context, String spotId, String bookingId) async {
     try {
-      // Check if the parking spot still exists
+      // First check if the parking spot still exists
       final spotDoc = await FirebaseFirestore.instance
           .collection('parking_spots')
           .doc(spotId)
           .get();
 
-      // If spot doesn't exist, mark booking as completed and remove from active bookings
-      if (!spotDoc.exists) {
+      if (spotDoc.exists) {
+        // Spot exists, proceed with normal end parking
+        await FirebaseFirestore.instance
+            .collection('parking_spots')
+            .doc(spotId)
+            .update({'isAvailable': true});
+        await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .update({
+          'status': 'completed',
+          'endTime': Timestamp.now(),
+        });
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Parking ended and spot relisted!',
+              ),
+            ),
+          );
+        }
+      } else {
+        // Spot no longer exists, just mark booking as completed
         await FirebaseFirestore.instance
             .collection('bookings')
             .doc(bookingId)
@@ -1068,22 +1246,63 @@ class BookingHistoryPage extends StatelessWidget {
           'endTime': Timestamp.now(),
           'note': 'Parking spot was deleted by owner',
         });
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Booking ended (spot no longer available)',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e) {
-      // If there's an error checking the spot, it likely doesn't exist
-      // Mark the booking as completed
-      try {
-        await FirebaseFirestore.instance
-            .collection('bookings')
-            .doc(bookingId)
-            .update({
-          'status': 'spot_deleted',
-          'endTime': Timestamp.now(),
-          'note': 'Parking spot no longer available',
-        });
-      } catch (updateError) {
-        // If we can't update the booking, at least we tried
-        print('Error cleaning up orphaned booking: $updateError');
+      // Handle the case where spot might not exist
+      if (e.toString().contains('not-found')) {
+        try {
+          // Just mark booking as completed since spot doesn't exist
+          await FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(bookingId)
+              .update({
+            'status': 'spot_deleted',
+            'endTime': Timestamp.now(),
+            'note': 'Parking spot no longer available',
+          });
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Booking ended (spot no longer available)',
+                ),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } catch (updateError) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Error ending booking: ${updateError.toString()}',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to end parking: ${e.toString()}',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -1095,162 +1314,172 @@ class BookingHistoryPage extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(title: const Text('My Booking History')),
         body: const Center(
-          child: Text('Please log in to see booking history.'),
+          child: Text('Please log in to see your booking history.'),
         ),
       );
     }
+
     return Scaffold(
       appBar: AppBar(title: const Text('My Booking History')),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('bookings')
             .where('userId', isEqualTo: user.uid)
-            .orderBy('bookingTime', descending: true)
+            .orderBy('startTime', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: \\${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
+
           final bookings = snapshot.data?.docs ?? [];
           if (bookings.isEmpty) {
-            return const Center(child: Text('No booking history.'));
+            return const Center(
+              child: Text('No booking history found.'),
+            );
           }
+
           return ListView.builder(
             itemCount: bookings.length,
             itemBuilder: (context, index) {
               final booking = bookings[index];
               final data = booking.data() as Map<String, dynamic>;
-              final spotId = data['spotId'] as String? ?? 'N/A';
               final address = data['address'] as String? ?? 'No address';
-              final status = data['status'] as String? ?? 'Unknown';
-              final bookingTimeTimestamp = data['bookingTime'] as Timestamp?;
-              final endTimeTimestamp = data['endTime'] as Timestamp?;
-              final bookingTime = bookingTimeTimestamp != null
-                  ? _formatDateTime(
-                      context, bookingTimeTimestamp.toDate().toLocal())
-                  : 'N/A';
-              final endTime = endTimeTimestamp != null
-                  ? _formatDateTime(
-                      context, endTimeTimestamp.toDate().toLocal())
-                  : 'N/A';
+              final spotId = data['spotId'] as String? ?? '';
+              final status = data['status'] as String? ?? 'active';
+              final startTime = data['startTime'] as Timestamp?;
+              final endTime = data['endTime'] as Timestamp?;
+              final bookingId = booking.id;
+
+              final startTimeString = startTime != null
+                  ? _formatDateTime(context, startTime.toDate())
+                  : 'Unknown';
+              final endTimeString = endTime != null
+                  ? _formatDateTime(context, endTime.toDate())
+                  : 'Ongoing';
+
+              final isActive = status == 'active';
 
               return Card(
-                child: ListTile(
-                  title: Text(address),
-                  subtitle: Text(
-                    'Status: $status\nBooked: $bookingTime\nEnded: $endTime',
-                  ),
-                  trailing: status == 'booked'
-                      ? ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange[700],
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isActive ? Icons.directions_car : Icons.history,
+                            color: isActive ? Colors.green : Colors.grey,
                           ),
-                          onPressed: () async {
-                            try {
-                              // First check if the parking spot still exists
-                              final spotDoc = await FirebaseFirestore.instance
-                                  .collection('parking_spots')
-                                  .doc(spotId)
-                                  .get();
-
-                              if (spotDoc.exists) {
-                                // Spot exists, proceed with normal end parking
-                                await FirebaseFirestore.instance
-                                    .collection('parking_spots')
-                                    .doc(spotId)
-                                    .update({'isAvailable': true});
-                                await FirebaseFirestore.instance
-                                    .collection('bookings')
-                                    .doc(booking.id)
-                                    .update({
-                                  'status': 'completed',
-                                  'endTime': Timestamp.now(),
-                                });
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Parking ended and spot relisted!',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              } else {
-                                // Spot no longer exists, just mark booking as completed
-                                await FirebaseFirestore.instance
-                                    .collection('bookings')
-                                    .doc(booking.id)
-                                    .update({
-                                  'status': 'spot_deleted',
-                                  'endTime': Timestamp.now(),
-                                  'note': 'Parking spot was deleted by owner',
-                                });
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Booking ended (spot no longer available)',
-                                      ),
-                                      backgroundColor: Colors.orange,
-                                    ),
-                                  );
-                                }
-                              }
-                            } catch (e) {
-                              // Handle the case where spot might not exist
-                              if (e.toString().contains('not-found')) {
-                                try {
-                                  // Just mark booking as completed since spot doesn't exist
-                                  await FirebaseFirestore.instance
-                                      .collection('bookings')
-                                      .doc(booking.id)
-                                      .update({
-                                    'status': 'spot_deleted',
-                                    'endTime': Timestamp.now(),
-                                    'note': 'Parking spot no longer available',
-                                  });
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Booking ended (spot no longer available)',
-                                        ),
-                                        backgroundColor: Colors.orange,
-                                      ),
-                                    );
-                                  }
-                                } catch (updateError) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Error ending booking: ${updateError.toString()}',
-                                        ),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                }
-                              } else {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Failed to end parking: ${e.toString()}',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                              }
-                            }
-                          },
-                          child: const Text('End Parking'),
-                        )
-                      : null,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              address,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isActive ? Colors.green.shade100 : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              isActive ? 'Active' : status.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isActive ? Colors.green.shade700 : Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Started: $startTimeString',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      if (!isActive) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.schedule, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Ended: $endTimeString',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (isActive) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            // QR Scanner button
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _openQrScannerForBookingHistory(context, spotId, address, bookingId),
+                                icon: const Icon(Icons.qr_code_scanner, size: 18),
+                                label: const Text(
+                                  'Scan QR',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal.shade600,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  elevation: 2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // End Parking button
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _endParkingFromHistory(context, spotId, bookingId),
+                                icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                                label: const Text(
+                                  'End Parking',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade600,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  elevation: 2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -1284,6 +1513,20 @@ class _ListSpotPageState extends State<ListSpotPage> {
       target: LatLng(23.7624, 90.3785),
       zoom: 14,
     );
+  }
+
+  // Method to move camera to selected spot
+  Future<void> _moveCameraToSpot(LatLng spotLocation) async {
+    if (_mapController != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: spotLocation,
+            zoom: 16, // Zoom in closer to the selected spot
+          ),
+        ),
+      );
+    }
   }
 
   // Method to move camera to user location
@@ -1711,70 +1954,9 @@ class _HomePageState extends State<HomePage> {
   // Helper method to format just time according to device settings
   static String _formatTime(BuildContext context, DateTime dateTime) {
     final MediaQueryData mediaQuery = MediaQuery.of(context);
-    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
-
-    return is24HourFormat
+    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;    return is24HourFormat
         ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
         : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
-  }
-
-  Future<Map<String, String>> _getUserDetails(User user) async {
-    String userName = 'User'; // Default
-    String profileImageUrl = ''; // Default
-
-    // Try Firebase Auth display name first if available
-    if (user.displayName != null && user.displayName!.isNotEmpty) {
-      userName = user.displayName!;
-    }
-
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (userDoc.exists && userDoc.data() != null) {
-        final data = userDoc.data()!;
-
-        // Prioritize Firestore 'name' field if it exists and is not empty
-        String firestoreFullName = data['name'] as String? ?? '';
-        if (firestoreFullName.isNotEmpty) {
-          userName = firestoreFullName;
-        } else {
-          // Fallback to constructing name from firstName and lastName if 'name' is not available
-          final firstName = data['firstName'] as String? ?? '';
-          final lastName = data['lastName'] as String? ?? '';
-          if (firstName.isNotEmpty && lastName.isNotEmpty) {
-            userName = '$firstName $lastName'.trim();
-          } else if (firstName.isNotEmpty) {
-            userName = firstName.trim();
-          } else if (lastName.isNotEmpty) {
-            userName = lastName.trim();
-          }
-          // If userName is still 'User' (meaning no name from auth and no specific name from Firestore fields)
-          // it will be handled by the fallback logic below.
-        }
-        profileImageUrl = data['profileImageUrl'] as String? ?? '';
-      }
-    } catch (e) {
-      print('Error getting user details from Firestore: $e');
-      // In case of error, defaults or auth data (if already set to userName) will be used.
-    }
-
-    // Fallback to email if userName is still the generic 'User' or empty,
-    // and auth display name was also null/empty.
-    if ((userName == 'User' || userName.trim().isEmpty) &&
-        (user.displayName == null || user.displayName!.isEmpty)) {
-      if (user.email != null && user.email!.contains('@')) {
-        userName = user.email!.split('@')[0];
-      }
-    }
-
-    // Final fallback to ensure userName is not empty.
-    if (userName.trim().isEmpty) {
-      userName = 'User';
-    }
-
-    return {'userName': userName, 'profileImageUrl': profileImageUrl};
   }
 
   Widget _buildHomeButton(
@@ -1865,7 +2047,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
   Widget _buildBookedSpotCard(
     BuildContext context, {
     required String spotId,
@@ -1896,17 +2077,12 @@ class _HomePageState extends State<HomePage> {
             width: 1.5,
           ),
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () =>
-                _showUnbookingDialog(context, spotId, address, bookingId),
-            splashColor: Colors.orange.withValues(alpha: 0.2),
-            highlightColor: Colors.orange.withValues(alpha: 0.1),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -1983,28 +2159,109 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  Column(
-                    children: [
-                      Icon(
-                        Icons.touch_app,
-                        color: Colors.orange.shade600,
-                        size: 16,
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Action buttons row
+              Row(
+                children: [
+                  // QR Scanner button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openQrScannerForBookedSpot(context, spotId, address),
+                      icon: const Icon(Icons.qr_code_scanner, size: 18),
+                      label: const Text(
+                        'Scan QR',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Tap to unbook',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.orange.shade600,
-                          fontWeight: FontWeight.w500,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        elevation: 2,
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Unbook button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showUnbookingDialog(context, spotId, address, bookingId),
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text(
+                        'Unbook',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 2,
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // Method to open QR scanner for booked spots
+  void _openQrScannerForBookedSpot(BuildContext context, String spotId, String address) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => QrScannerPage(
+          expectedSpotId: spotId,
+          address: address,
+          onSuccess: () {
+            // Show success message when QR is successfully scanned
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('QR Code verified successfully!'),
+                  ],
+                ),
+                backgroundColor: Colors.green[600],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          },
+          onSkip: () {
+            // Show message when user skips QR scanning
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('QR scanning skipped'),
+                  ],
+                ),
+                backgroundColor: Colors.orange[600],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -2170,441 +2427,199 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Failed to unbook: ${e.toString()}'),
+      // Handle the case where spot might not exist
+      if (e.toString().contains('not-found')) {
+        try {
+          // Just mark booking as completed since spot doesn't exist
+          await FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(bookingId)
+              .update({
+            'status': 'spot_deleted',
+            'endTime': Timestamp.now(),
+            'note': 'Parking spot no longer available',
+          });
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Booking ended (spot no longer available)',
                 ),
-              ],
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } catch (updateError) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Error ending booking: ${updateError.toString()}',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to unbook: ${e.toString()}',
+              ),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.red[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+          );
+        }
       }
-    }
-  }
-
-  Widget _buildDrawerListTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.transparent,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          splashColor:
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-          highlightColor:
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
-          onTap: () {
-            Navigator.pop(context); // Close the drawer
-            onTap(); // Perform the action
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: Colors.grey[800],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    Icons.chevron_right,
-                    color: Colors.grey[400],
-                    size: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Method to automatically expire a booking and move it to history
-  Future<void> _expireBooking(String bookingId, String spotId) async {
-    try {
-      // Update the booking status to expired
-      await FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(bookingId)
-          .update({
-        'status': 'expired',
-        'endTime': Timestamp.now(),
-      });
-
-      // Update the parking spot to be available again
-      await FirebaseFirestore.instance
-          .collection('parking_spots')
-          .doc(spotId)
-          .update({'isAvailable': true});
-
-      print('Booking $bookingId automatically expired and moved to history');
-    } catch (e) {
-      print('Error expiring booking $bookingId: $e');
-    }
-  }
+    }  }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Parking Manager')),
+        body: const Center(
+          child: Text('Please log in to access the app.'),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.directions_car,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Parking Manager',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.teal.shade600,
+        title: const Text('Parking Manager'),
+        backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
         elevation: 0,
-        // The hamburger icon will appear automatically due to the drawer property
+        actions: [
+          // Profile Button
+          IconButton(
+            icon: const Icon(Icons.account_circle, color: Colors.white),
+            tooltip: 'Profile',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
+          ),
+          // Logout Button
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Logout',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
       ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
-          children: <Widget>[
-            if (user != null)
-              FutureBuilder<Map<String, String>>(
-                future: _getUserDetails(user), // Uses the updated method
-                builder: (context, snapshot) {
-                  String userName;
-                  String profileImageUrl = ''; // Default to empty
-                  String userEmail = user.email ?? 'No email provided';
-
-                  if (snapshot.connectionState == ConnectionState.done) {
-                    if (snapshot.hasData) {
-                      // Use fetched data, fallback to auth display name or 'User'
-                      userName = snapshot.data!['userName'] ??
-                          (user.displayName ?? 'User');
-                      profileImageUrl = snapshot.data!['profileImageUrl'] ?? '';
-                    } else {
-                      // Error state: Fallback to auth display name or 'User'
-                      print(
-                          'Error fetching user details for drawer: ${snapshot.error}');
-                      userName = user.displayName ?? 'User';
-                      // profileImageUrl remains empty
-                    }
-                  } else {
-                    // Waiting state: Show auth display name or 'Loading...'
-                    // Avoid showing "Loading..." if auth name is available, provides a better UX.
-                    userName = user.displayName ?? 'Loading...';
-                    // profileImageUrl remains empty until data is loaded
-                  }
-
-                  // If after all logic, userName is still generic ('User' or 'Loading...')
-                  // and auth display name was empty, try deriving from email.
-                  if ((userName == 'User' || userName == 'Loading...') &&
-                      (user.displayName == null || user.displayName!.isEmpty)) {
-                    if (user.email != null &&
-                        user.email!.isNotEmpty &&
-                        user.email!.contains('@')) {
-                      userName = user.email!.split('@')[0];
-                    } else {
-                      // If email also doesn't help, ensure it's 'User' not 'Loading...'
-                      userName = 'User';
-                    }
-                  }
-
-                  // Final check to ensure userName is not empty if all else fails.
-                  if (userName.trim().isEmpty) {
-                    userName = 'User';
-                  }
-
-                  return Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.teal.shade400,
-                          Colors.teal.shade600,
-                          Colors.teal.shade800,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          20, 15, 20, 15), // Adjusted padding
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 3,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: CircleAvatar(
-                                  radius: 32,
-                                  backgroundColor: Colors.white,
-                                  backgroundImage: profileImageUrl.isNotEmpty
-                                      ? NetworkImage(profileImageUrl)
-                                      : null,
-                                  child: profileImageUrl.isEmpty
-                                      ? Text(
-                                          userName.isNotEmpty
-                                              ? userName[0].toUpperCase()
-                                              : 'U',
-                                          style: TextStyle(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.teal.shade700,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Hello!',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color:
-                                            Colors.white.withValues(alpha: 0.9),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      userName,
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.email_outlined,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    userEmail,
-                                    style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.9),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Spacer(),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.directions_car,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  size: 16,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Parking Manager',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              )
-            else
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                child: const Text(
-                  'Parking Manager',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                  ),
-                ),
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
               ),
-            _buildDrawerListTile(
-              context,
-              icon: Icons.account_circle_outlined,
-              title: 'Profile',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.directions_car,
+                      color: Colors.teal,
+                      size: 35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Parking Manager',
+                    style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),                  const SizedBox(height: 5),                  FutureBuilder<String>(
+                    future: _getUserName(user),
+                    builder: (context, snapshot) {
+                      String name = snapshot.data ?? 'User';
+                      return Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.search_outlined),
+              title: const Text('Book a Spot'),
               onTap: () {
+                Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                  MaterialPageRoute(builder: (context) => const BookSpotPage()),
                 );
               },
             ),
-            _buildDrawerListTile(
-              context,
-              icon: Icons.add_location_alt_outlined,
-              title: 'List a New Spot',
+            ListTile(
+              leading: const Icon(Icons.add_location_alt_outlined),
+              title: const Text('List a New Spot'),
               onTap: () {
+                Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const ListSpotPage()),
                 );
               },
             ),
-            _buildDrawerListTile(
-              context,
-              icon: Icons.history_edu_outlined,
-              title: 'My Listed Spots',
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.history_edu_outlined),
+              title: const Text('My Listed Spots'),
               onTap: () {
+                Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                      builder: (context) => const ListingHistoryPage()),
+                    builder: (context) => const ListingHistoryPage(),
+                  ),
                 );
               },
             ),
-            _buildDrawerListTile(
-              context,
-              icon: Icons.receipt_long_outlined,
-              title: 'My Booking History',
+            ListTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('My Booking History'),
               onTap: () {
+                Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                      builder: (context) => const BookingHistoryPage()),
+                    builder: (context) => const BookingHistoryPage(),
+                  ),
                 );
               },
             ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Colors.grey.shade300,
-                    Colors.transparent,
-                  ],
-                ),
-              ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.account_circle),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
             ),
-            _buildDrawerListTile(
-              context,
-              icon: Icons.logout,
-              title: 'Logout',
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
               onTap: () async {
+                Navigator.pop(context); // Close drawer
                 await FirebaseAuth.instance.signOut();
                 if (context.mounted) {
                   Navigator.of(context).pushAndRemoveUntil(
@@ -2617,500 +2632,219 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.teal.shade50,
-              Colors.white,
-              Colors.teal.shade50,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
+      body: Column(
+        children: [
+          // Welcome section with current bookings
+          Container(
+            width: double.infinity,
+            color: Colors.teal.shade50,
+            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Welcome Card
-                if (user != null)
-                  Card(
-                    elevation: 6,
-                    shadowColor: Colors.teal.withValues(alpha: 0.2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white,
-                            Colors.teal.shade50,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                FutureBuilder<String>(
+                  future: _getUserName(user),
+                  builder: (context, snapshot) {
+                    String name = snapshot.data ?? 'User';
+                    return Text(
+                      'Welcome, $name!',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal.shade800,
                       ),
-                      padding: const EdgeInsets.all(24),
-                      child: FutureBuilder<Map<String, String>>(
-                        future: _getUserDetails(user),
-                        builder: (context, snapshot) {
-                          String welcomeName = 'User';
-                          if (snapshot.connectionState ==
-                                  ConnectionState.done &&
-                              snapshot.hasData) {
-                            welcomeName = snapshot.data!['userName'] ?? 'User';
-                          } else if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            welcomeName = 'Loading...';
-                          } else if (snapshot.hasError) {
-                            // Keep default welcomeName
-                          }
-                          if (welcomeName == 'User' &&
-                              (user.displayName == null ||
-                                  user.displayName!.isEmpty) &&
-                              user.email != null &&
-                              user.email!.contains('@')) {
-                            welcomeName = user.email!.split('@')[0];
-                          }
-
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Manage your parking spots and bookings',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.teal.shade600,
+                  ),
+                ),
+                const SizedBox(height: 16),                // Current bookings section
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('bookings')
+                      .where('userId', isEqualTo: user.uid)
+                      .where('status', isEqualTo: 'active')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                      final booking = snapshot.data!.docs.first;
+                      final data = booking.data() as Map<String, dynamic>;
+                      final address = data['address'] as String? ?? 'No address';
+                      final startTime = (data['startTime'] as Timestamp).toDate();
+                      final timeString = _formatTime(context, startTime);
+                      final spotId = data['spotId'] as String? ?? '';
+                      final bookingId = booking.id;
+                      
+                      // Get the spot's availableUntil time to calculate correct remaining time
+                      return FutureBuilder<DocumentSnapshot>(
+                        future: FirebaseFirestore.instance
+                            .collection('parking_spots')
+                            .doc(spotId)
+                            .get(),
+                        builder: (context, spotSnapshot) {
+                          String remainingText = 'Loading...';
+                          
+                          if (spotSnapshot.hasData && spotSnapshot.data!.exists) {
+                            final spotData = spotSnapshot.data!.data() as Map<String, dynamic>;
+                            final availableUntilTimestamp = spotData['availableUntil'] as Timestamp?;
+                            
+                            if (availableUntilTimestamp != null) {
+                              final availableUntil = availableUntilTimestamp.toDate();
+                              final now = DateTime.now();
+                              final remaining = availableUntil.difference(now);
+                              
+                              remainingText = remaining.isNegative 
+                                  ? 'Expired' 
+                                  : '${remaining.inHours}h ${remaining.inMinutes % 60}m remaining';
+                            } else {
+                              remainingText = 'No time limit';
+                            }
+                          } else {
+                            remainingText = 'Spot unavailable';
+                          }                          
                           return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.teal.shade100,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Icon(
-                                      Icons.waving_hand,
-                                      color: Colors.teal.shade700,
-                                      size: 28,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Welcome back!',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Colors.grey[600],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          welcomeName,
-                                          style: TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.teal.shade800,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                'Current Booking',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.teal.shade800,
+                                ),
                               ),
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.teal.shade50,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.teal.shade200,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: Colors.teal.shade600,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'Ready to find your perfect parking spot?',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.teal.shade700,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              const SizedBox(height: 8),
+                              _buildBookedSpotCard(
+                                context,
+                                spotId: spotId,
+                                address: address,
+                                timeString: timeString,
+                                bookingId: bookingId,
+                                expectedEndTime: remainingText,
                               ),
                             ],
                           );
                         },
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 24),
-                // Quick Action Section
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.teal.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.flash_on,
-                              color: Colors.teal.shade700,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Quick Action',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              // Book a Parking Spot button
-                              _buildHomeButton(
-                                context,
-                                icon: Icons.search_outlined,
-                                label: 'Book a Parking Spot',
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const BookSpotPage(),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Booked Spots Section
-                              if (user != null)
-                                StreamBuilder<QuerySnapshot>(
-                                  stream: FirebaseFirestore.instance
-                                      .collection('bookings')
-                                      .where('userId', isEqualTo: user.uid)
-                                      .where('status', isEqualTo: 'booked')
-                                      .snapshots(),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.connectionState ==
-                                        ConnectionState.waiting) {
-                                      return const SizedBox(
-                                        height: 50,
-                                        child: Center(
-                                            child: CircularProgressIndicator()),
-                                      );
-                                    }
-
-                                    if (snapshot.hasError) {
-                                      return Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.shade50,
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: Colors.red.shade200,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.error_outline,
-                                              color: Colors.red[600],
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                'Error loading booked spots',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.red[700],
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
-
-                                    final bookings = snapshot.data?.docs ?? [];
-
-                                    if (bookings.isNotEmpty) {
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Booked spots header
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(6),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.shade100,
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                                child: Icon(
-                                                  Icons.local_parking,
-                                                  color: Colors.orange.shade700,
-                                                  size: 16,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Your Booked Spots',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.grey[800],
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 2,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.shade600,
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                ),
-                                                child: Text(
-                                                  '${bookings.length}',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(
-                                              height: 12), // Booked spots list
-                                          ...bookings.map((booking) {
-                                            final data = booking.data()
-                                                as Map<String, dynamic>;
-                                            final spotId =
-                                                data['spotId'] as String? ??
-                                                    'Unknown';
-                                            final address =
-                                                data['address'] as String? ??
-                                                    'No address';
-                                            final bookingTime =
-                                                data['bookingTime']
-                                                    as Timestamp?;
-                                            final timeString =
-                                                bookingTime != null
-                                                    ? _formatTime(
-                                                        context,
-                                                        bookingTime
-                                                            .toDate()
-                                                            .toLocal())
-                                                    : 'Unknown';
-
-                                            return Container(
-                                              margin: const EdgeInsets.only(
-                                                  bottom: 12),
-                                              child: FutureBuilder<
-                                                  DocumentSnapshot>(
-                                                future: FirebaseFirestore
-                                                    .instance
-                                                    .collection('parking_spots')
-                                                    .doc(spotId)
-                                                    .get(),
-                                                builder:
-                                                    (context, spotSnapshot) {
-                                                  // Check if parking spot exists
-                                                  if (spotSnapshot.hasData &&
-                                                      !spotSnapshot
-                                                          .data!.exists) {
-                                                    // Parking spot doesn't exist - this is an orphaned booking
-                                                    // Clean it up asynchronously and don't display it
-
-                                                    WidgetsBinding.instance
-                                                        .addPostFrameCallback(
-                                                            (_) {
-                                                      BookingHistoryPage
-                                                          ._cleanupOrphanedBooking(
-                                                              booking.id,
-                                                              spotId);
-                                                    });
-                                                    return const SizedBox
-                                                        .shrink(); // Hide this booking from UI
-                                                  } // Calculate remaining time until end and handle expiration
-                                                  String remainingTime =
-                                                      'Unknown';
-                                                  if (bookingTime != null) {
-                                                    DateTime? endTime;
-
-                                                    if (spotSnapshot.hasData &&
-                                                        spotSnapshot
-                                                            .data!.exists) {
-                                                      final spotData =
-                                                          spotSnapshot.data!
-                                                                  .data()
-                                                              as Map<String,
-                                                                  dynamic>?;
-                                                      final availableUntilTimestamp =
-                                                          spotData?[
-                                                                  'availableUntil']
-                                                              as Timestamp?;
-
-                                                      if (availableUntilTimestamp !=
-                                                          null) {
-                                                        // Use the actual availableUntil time from the parking spot
-                                                        endTime =
-                                                            availableUntilTimestamp
-                                                                .toDate()
-                                                                .toLocal();
-                                                      }
-                                                    }
-
-                                                    // Fallback to 24 hours if no availableUntil is found
-                                                    endTime ??= bookingTime
-                                                        .toDate()
-                                                        .toLocal()
-                                                        .add(const Duration(
-                                                            hours: 24));
-
-                                                    final now = DateTime.now();
-                                                    final difference =
-                                                        endTime.difference(now);
-
-                                                    if (difference.isNegative) {
-                                                      // Automatically expire the booking
-                                                      _expireBooking(
-                                                          booking.id, spotId);
-                                                      return const SizedBox
-                                                          .shrink(); // Don't show expired bookings
-                                                    } else {
-                                                      final hours =
-                                                          difference.inHours;
-                                                      final minutes =
-                                                          difference.inMinutes %
-                                                              60;
-                                                      if (hours > 0) {
-                                                        remainingTime =
-                                                            '${hours}h ${minutes}m remaining';
-                                                      } else {
-                                                        remainingTime =
-                                                            '${minutes}m remaining';
-                                                      }
-                                                    }
-                                                  }
-
-                                                  return _buildBookedSpotCard(
-                                                    context,
-                                                    spotId: spotId,
-                                                    address: address,
-                                                    timeString: timeString,
-                                                    bookingId: booking.id,
-                                                    expectedEndTime:
-                                                        remainingTime,
-                                                  );
-                                                },
-                                              ),
-                                            );
-                                          }).toList(),
-                                          const SizedBox(height: 8),
-                                        ],
-                                      );
-                                    }
-
-                                    return const SizedBox.shrink();
-                                  },
-                                ),
-
-                              // Additional features hint
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.grey.shade200,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.menu,
-                                      color: Colors.grey[600],
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'Explore more features in the menu',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[600],
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.arrow_forward,
-                                      color: Colors.grey[400],
-                                      size: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                      );
+                    }
+                    return Container();
+                  },
                 ),
               ],
             ),
           ),
-        ),
+          // Quick actions
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quick Actions',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildHomeButton(
+                    context,
+                    icon: Icons.search_outlined,
+                    label: 'Book a Parking Spot',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const BookSpotPage()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _buildHomeButton(
+                    context,
+                    icon: Icons.add_location_alt_outlined,
+                    label: 'List a New Spot',
+                    backgroundColor: Colors.orange.shade400,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const ListSpotPage()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _buildHomeButton(
+                    context,
+                    icon: Icons.receipt_long_outlined,
+                    label: 'My Booking History',
+                    backgroundColor: Colors.purple.shade400,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const BookingHistoryPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _buildHomeButton(
+                    context,
+                    icon: Icons.history_edu_outlined,
+                    label: 'My Listed Spots',
+                    backgroundColor: Colors.blue.shade400,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const ListingHistoryPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-// QrCodePage widget displays a QR code for a given parking spot
+  // Helper method to get user name for display
+  Future<String> _getUserName(User user) async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (userDoc.exists && userDoc.data() != null) {
+        final data = userDoc.data()!;
+        final name = data['name'] as String? ?? '';
+        if (name.isNotEmpty) {
+          return name;
+        }
+      }
+    } catch (e) {
+      print('Error getting user name: $e');
+    }
+    
+    // Fallback to display name or email
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    
+    // Final fallback to email username
+    if (user.email != null && user.email!.contains('@')) {
+      return user.email!.split('@')[0];
+    }
+    
+    return 'User';
+  }
+}
 
 class QrCodePage extends StatelessWidget {
   final String spotId;
@@ -3216,6 +2950,137 @@ class _BookSpotPageState extends State<BookSpotPage> {
     ExpiredSpotTracker.checkAndUpdateExpiredSpots();
   }
 
+  // Method to get user name for display
+  Future<String> _getUserName(User user) async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (userDoc.exists && userDoc.data() != null) {
+        final data = userDoc.data()!;
+        final name = data['name'] as String? ?? '';
+        if (name.isNotEmpty) {
+          return name;
+        }
+      }
+    } catch (e) {
+      print('Error getting user name: $e');
+    }
+    
+    // Fallback to display name or email
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    if (user.email != null && user.email!.contains('@')) {
+      return user.email!.split('@')[0];
+    }
+    return 'User';
+  }
+
+  // Method to book a parking spot
+  Future<void> _bookSpot(String spotId, String address) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _error = 'You must be logged in to book a spot.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Check if spot is still available
+      final spotDoc = await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .get();
+
+      if (!spotDoc.exists) {
+        setState(() {
+          _error = 'This parking spot is no longer available.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final spotData = spotDoc.data() as Map<String, dynamic>;
+      final isAvailable = spotData['isAvailable'] == true;
+      final availableUntil = (spotData['availableUntil'] as Timestamp?)?.toDate();
+
+      if (!isAvailable) {
+        setState(() {
+          _error = 'This parking spot has already been booked.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (availableUntil != null && availableUntil.isBefore(DateTime.now())) {
+        setState(() {
+          _error = 'This parking spot has expired.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Create booking
+      await FirebaseFirestore.instance.collection('bookings').add({
+        'userId': user.uid,
+        'spotId': spotId,
+        'address': address,
+        'startTime': Timestamp.now(),
+        'status': 'active',
+        'userEmail': user.email,
+      });
+
+      // Mark spot as booked
+      await FirebaseFirestore.instance
+          .collection('parking_spots')
+          .doc(spotId)
+          .update({'isAvailable': false});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Parking spot booked successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+
+        // Clear selection and navigate back
+        setState(() {
+          _selectedSpotId = null;
+          _selectedLatLng = null;
+          _selectedAddress = null;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to book parking spot: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<CameraPosition> _getInitialCameraPosition() async {
     final position = await LocationService.getCurrentLocation();
     if (position != null) {
@@ -3231,7 +3096,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
     );
   }
 
-  // Add method to move camera to selected spot
+  // Method to move camera to selected spot
   Future<void> _moveCameraToSpot(LatLng spotLocation) async {
     if (_mapController != null) {
       await _mapController!.animateCamera(
@@ -3295,98 +3160,6 @@ class _BookSpotPageState extends State<BookSpotPage> {
     }
   }
 
-  Future<String> _getUserName(User user) async {
-    if (user.displayName != null && user.displayName!.isNotEmpty) {
-      return user.displayName!;
-    }
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (userDoc.exists && userDoc.data() != null) {
-        return userDoc.data()!['name'] ?? 'User';
-      }
-    } catch (e) {
-      // Handle error appropriately
-    }
-    return 'User';
-  }
-
-  Future<void> _bookSpot(String spotId, String address) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() {
-        _isLoading = false;
-        _error = 'You must be logged in to book a spot.';
-      });
-      return;
-    }
-    try {
-      await FirebaseFirestore.instance
-          .collection('parking_spots')
-          .doc(spotId)
-          .update({'isAvailable': false});
-      await FirebaseFirestore.instance.collection('bookings').add({
-        'spotId': spotId,
-        'userId': user.uid,
-        'address': address,
-        'status': 'booked',
-        'bookingTime': Timestamp.now(),
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Spot booked successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to book spot: \\${e.toString()}';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  void _openQrScanner() {
-    if (_selectedSpotId == null || _selectedAddress == null) {
-      setState(() {
-        _error = 'Please select a parking spot first.';
-      });
-      return;
-    }
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => QrScannerPage(
-          expectedSpotId: _selectedSpotId!,
-          address: _selectedAddress!,
-          onSuccess: () {
-            // This will be called when QR scan is successful
-            _bookSpot(_selectedSpotId!, _selectedAddress!);
-          },
-          onSkip: () {
-            // This will be called when user chooses to continue without QR scan
-            Navigator.of(context).pop(); // Close scanner page
-            _bookSpot(_selectedSpotId!, _selectedAddress!);
-          },
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -3441,26 +3214,23 @@ class _BookSpotPageState extends State<BookSpotPage> {
                       size: 35,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
+                  const SizedBox(height: 10),                  const Text(
                     'Parking Manager',
                     style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),                  const SizedBox(height: 5),
+                  FutureBuilder<String>(
+                    future: _getUserName(user!),
+                    builder: (context, snapshot) {
+                      String name = snapshot.data ?? 'User';
+                      return Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      );
+                    },
                   ),
-                  const SizedBox(height: 5),
-                  if (user != null)
-                    FutureBuilder<String>(
-                      future: _getUserName(user),
-                      builder: (context, snapshot) {
-                        String name = snapshot.data ?? 'User';
-                        return Text(
-                          name,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        );
-                      },
-                    ),
                 ],
               ),
             ),
@@ -3899,15 +3669,27 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                     style: const TextStyle(fontSize: 13),
                                   ),
                                   const SizedBox(height: 16),
-                                  // QR Scanner Button
+                                  // Confirm Booking Button
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
                                       onPressed: _isLoading
                                           ? null
-                                          : () => _openQrScanner(),
-                                      icon: const Icon(Icons.qr_code_scanner),
-                                      label: const Text('Scan QR Code'),
+                                          : () => _bookSpot(
+                                                _selectedSpotId!,
+                                                _selectedAddress ?? '',
+                                              ),
+                                      icon: _isLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(Icons.check_circle_outline),
+                                      label: Text(_isLoading ? 'BOOKING...' : 'Confirm Booking'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal[600],
                                         foregroundColor: Colors.white,
@@ -3920,51 +3702,6 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                         ),
                                         elevation: 4,
                                       ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // Regular Confirm Booking Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: _isLoading
-                                          ? null
-                                          : () => _bookSpot(
-                                                _selectedSpotId!,
-                                                _selectedAddress ?? '',
-                                              ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange[700],
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        elevation: 2,
-                                      ),
-                                      child: _isLoading
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                        Color>(
-                                                  Colors.white,
-                                                ),
-                                              ),
-                                            )
-                                          : const Text(
-                                              'Book without QR Scan',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
                                     ),
                                   ),
                                 ],

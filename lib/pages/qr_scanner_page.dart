@@ -50,7 +50,6 @@ class _QrScannerPageState extends State<QrScannerPage> {
       }
     }
   }
-
   void _showSuccessDialog() {
     showDialog(
       context: context,
@@ -58,7 +57,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
         title: const Text('QR Code Verified!'),
-        content: Text('Parking spot verified: ${widget.expectedSpotId}'),
+        content: Text('Parking spot verified at:\n${widget.address}'),
         actions: [
           ElevatedButton(
             onPressed: () {
@@ -72,7 +71,6 @@ class _QrScannerPageState extends State<QrScannerPage> {
       ),
     );
   }
-
   void _showErrorDialog(String scannedCode) {
     showDialog(
       context: context,
@@ -80,9 +78,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
         icon: const Icon(Icons.error, color: Colors.red, size: 48),
         title: const Text('Wrong QR Code'),
         content: Text(
-          'Expected: ${widget.expectedSpotId}\nScanned: $scannedCode\n\nPlease scan the correct QR code for this parking spot.',
-        ),
-        actions: [
+          'The QR code you scanned does not match this parking spot at:\n${widget.address}\n\nPlease scan the correct QR code for this location.',
+        ),        actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
@@ -91,14 +88,6 @@ class _QrScannerPageState extends State<QrScannerPage> {
               });
             },
             child: const Text('Try Again'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Close scanner
-              widget.onSkip();
-            },
-            child: const Text('Continue Without QR'),
           ),
         ],
       ),
@@ -148,8 +137,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
+                  child: Column(                    children: [
                       Icon(Icons.qr_code_scanner,
                           size: 32, color: Colors.teal.shade700),
                       const SizedBox(height: 8),
@@ -166,14 +154,6 @@ class _QrScannerPageState extends State<QrScannerPage> {
                         widget.address,
                         style: const TextStyle(fontSize: 14),
                         textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Spot ID: ${widget.expectedSpotId}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
                       ),
                     ],
                   ),
@@ -198,9 +178,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   ),
                 ),
               ),
-            ),
-
-            // Bottom section with continue button
+            ),            // Bottom section with instructions only
             Expanded(
               flex: 1,
               child: Container(
@@ -215,26 +193,6 @@ class _QrScannerPageState extends State<QrScannerPage> {
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          widget.onSkip();
-                        },
-                        icon: const Icon(Icons.skip_next),
-                        label: const Text('Continue without QR code'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange[700],
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
                       ),
                     ),
                   ],
