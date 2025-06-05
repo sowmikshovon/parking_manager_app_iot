@@ -251,18 +251,19 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _error;
-  bool _obscurePassword = true;  Future<void> _signIn() async {
+  bool _obscurePassword = true;
+  Future<void> _signIn() async {
     // Validate empty fields before attempting authentication
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-    
+
     if (email.isEmpty) {
       setState(() {
         _error = "Please enter your email address.";
       });
       return;
     }
-    
+
     if (password.isEmpty) {
       setState(() {
         _error = "Please enter your password.";
@@ -292,10 +293,12 @@ class _LoginPageState extends State<LoginPage> {
             _error = "The password you entered is incorrect. Please try again.";
             break;
           case 'user-not-found':
-            _error = "No account found with this email address. Please check your email or sign up.";
+            _error =
+                "No account found with this email address. Please check your email or sign up.";
             break;
           case 'invalid-email':
-            _error = "The email address is not valid. Please enter a valid email.";
+            _error =
+                "The email address is not valid. Please enter a valid email.";
             break;
           case 'user-disabled':
             _error = "This account has been disabled. Please contact support.";
@@ -304,10 +307,12 @@ class _LoginPageState extends State<LoginPage> {
             _error = "Too many failed login attempts. Please try again later.";
             break;
           case 'invalid-credential':
-            _error = "Invalid email or password. Please check your credentials and try again.";
+            _error =
+                "Invalid email or password. Please check your credentials and try again.";
             break;
           case 'network-request-failed':
-            _error = "Network error. Please check your internet connection and try again.";
+            _error =
+                "Network error. Please check your internet connection and try again.";
             break;
           default:
             _error = e.message ?? "Login failed. Please try again.";
@@ -529,23 +534,29 @@ class _SignUpPageState extends State<SignUpPage> {
             backgroundColor: Colors.green,
           ),
         );
-      }    } on FirebaseAuthException catch (e) {
+      }
+    } on FirebaseAuthException catch (e) {
       setState(() {
         switch (e.code) {
           case 'email-already-in-use':
-            _error = 'This email address is already registered. Please use a different email or try logging in.';
+            _error =
+                'This email address is already registered. Please use a different email or try logging in.';
             break;
           case 'weak-password':
-            _error = 'The password is too weak. Please choose a stronger password.';
+            _error =
+                'The password is too weak. Please choose a stronger password.';
             break;
           case 'invalid-email':
-            _error = 'The email address is not valid. Please enter a valid email.';
+            _error =
+                'The email address is not valid. Please enter a valid email.';
             break;
           case 'operation-not-allowed':
-            _error = 'Email/password accounts are not enabled. Please contact support.';
+            _error =
+                'Email/password accounts are not enabled. Please contact support.';
             break;
           case 'network-request-failed':
-            _error = 'Network error. Please check your internet connection and try again.';
+            _error =
+                'Network error. Please check your internet connection and try again.';
             break;
           default:
             _error = e.message ?? 'Sign up failed. Please try again.';
@@ -694,11 +705,10 @@ class ListingHistoryPage extends StatelessWidget {
             .orderBy('created_at', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+          if (snapshot.connectionState == ConnectionState.waiting) {          return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: \\${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
           final spots = snapshot.data?.docs ?? [];
           if (spots.isEmpty) {
@@ -711,7 +721,8 @@ class ListingHistoryPage extends StatelessWidget {
               final data = spot.data() as Map<String, dynamic>;
               final address = data['address'] as String? ?? 'No address';
               final spotId = spot.id;
-              final isAvailable = data['isAvailable'] == true;              // Check availability status based on time
+              final isAvailable = data['isAvailable'] ==
+                  true; // Check availability status based on time
               final availableUntilTimestamp =
                   data['availableUntil'] as Timestamp?;
               final DateTime? availableUntil =
@@ -722,7 +733,7 @@ class ListingHistoryPage extends StatelessWidget {
               // Default status
               String statusText = 'Available';
               Color statusColor = Colors.green;
-              
+
               if (!isAvailable) {
                 // Need to check if it's actually booked or just expired
                 // This will be handled by the StreamBuilder below
@@ -739,7 +750,8 @@ class ListingHistoryPage extends StatelessWidget {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Spot ID: $spotId'),                      Row(
+                      Text('Spot ID: $spotId'),
+                      Row(
                         children: [
                           Text('Status: '),
                           if (!isAvailable)
@@ -752,7 +764,8 @@ class ListingHistoryPage extends StatelessWidget {
                                   .limit(1)
                                   .snapshots(),
                               builder: (context, bookingSnapshot) {
-                                if (bookingSnapshot.connectionState == ConnectionState.waiting) {
+                                if (bookingSnapshot.connectionState ==
+                                    ConnectionState.waiting) {
                                   return Text(
                                     'Checking...',
                                     style: TextStyle(
@@ -761,10 +774,11 @@ class ListingHistoryPage extends StatelessWidget {
                                     ),
                                   );
                                 }
-                                
-                                final hasActiveBooking = bookingSnapshot.hasData && 
-                                    bookingSnapshot.data!.docs.isNotEmpty;
-                                
+
+                                final hasActiveBooking =
+                                    bookingSnapshot.hasData &&
+                                        bookingSnapshot.data!.docs.isNotEmpty;
+
                                 if (hasActiveBooking) {
                                   return Text(
                                     'Booked',
@@ -876,11 +890,10 @@ class ListingHistoryPage extends StatelessWidget {
                                 );
                               }
                             } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                              if (context.mounted) {                                ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Failed to delete: \\${e.toString()}',
+                                      'Failed to delete: ${e.toString()}',
                                     ),
                                     backgroundColor: Colors.red,
                                   ),
@@ -1153,8 +1166,10 @@ class BookingHistoryPage extends StatelessWidget {
         : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
     return '$date $time';
   }
+
   // Method to open QR scanner for booked spots in booking history
-  static void _openQrScannerForBookingHistory(BuildContext context, String spotId, String address, String bookingId) {
+  static void _openQrScannerForBookingHistory(
+      BuildContext context, String spotId, String address, String bookingId) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => QrScannerPage(
@@ -1206,7 +1221,8 @@ class BookingHistoryPage extends StatelessWidget {
   }
 
   // Method to end parking from booking history
-  static Future<void> _endParkingFromHistory(BuildContext context, String spotId, String bookingId) async {
+  static Future<void> _endParkingFromHistory(
+      BuildContext context, String spotId, String bookingId) async {
     try {
       // First check if the parking spot still exists
       final spotDoc = await FirebaseFirestore.instance
@@ -1392,7 +1408,9 @@ class BookingHistoryPage extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: isActive ? Colors.green.shade100 : Colors.grey.shade100,
+                              color: isActive
+                                  ? Colors.green.shade100
+                                  : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -1400,7 +1418,9 @@ class BookingHistoryPage extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: isActive ? Colors.green.shade700 : Colors.grey.shade700,
+                                color: isActive
+                                    ? Colors.green.shade700
+                                    : Colors.grey.shade700,
                               ),
                             ),
                           ),
@@ -1409,11 +1429,13 @@ class BookingHistoryPage extends StatelessWidget {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                          const Icon(Icons.access_time,
+                              size: 16, color: Colors.grey),
                           const SizedBox(width: 4),
                           Text(
                             'Started: $startTimeString',
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -1421,11 +1443,13 @@ class BookingHistoryPage extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.schedule, size: 16, color: Colors.grey),
+                            const Icon(Icons.schedule,
+                                size: 16, color: Colors.grey),
                             const SizedBox(width: 4),
                             Text(
                               'Ended: $endTimeString',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -1437,16 +1461,22 @@ class BookingHistoryPage extends StatelessWidget {
                             // QR Scanner button
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () => _openQrScannerForBookingHistory(context, spotId, address, bookingId),
-                                icon: const Icon(Icons.qr_code_scanner, size: 18),
+                                onPressed: () =>
+                                    _openQrScannerForBookingHistory(
+                                        context, spotId, address, bookingId),
+                                icon:
+                                    const Icon(Icons.qr_code_scanner, size: 18),
                                 label: const Text(
                                   'Scan QR',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.teal.shade600,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -1458,16 +1488,21 @@ class BookingHistoryPage extends StatelessWidget {
                             // End Parking button
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () => _endParkingFromHistory(context, spotId, bookingId),
-                                icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                                onPressed: () => _endParkingFromHistory(
+                                    context, spotId, bookingId),
+                                icon: const Icon(Icons.stop_circle_outlined,
+                                    size: 18),
                                 label: const Text(
                                   'End Parking',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.red.shade600,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -1513,20 +1548,6 @@ class _ListSpotPageState extends State<ListSpotPage> {
       target: LatLng(23.7624, 90.3785),
       zoom: 14,
     );
-  }
-
-  // Method to move camera to selected spot
-  Future<void> _moveCameraToSpot(LatLng spotLocation) async {
-    if (_mapController != null) {
-      await _mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: spotLocation,
-            zoom: 16, // Zoom in closer to the selected spot
-          ),
-        ),
-      );
-    }
   }
 
   // Method to move camera to user location
@@ -1829,8 +1850,7 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
+              ),              const SizedBox(height: 8),
               Text(
                 'Lat: ${widget.selectedLatLng.latitude.toStringAsFixed(6)}, Lng: ${widget.selectedLatLng.longitude.toStringAsFixed(6)}',
                 style: Theme.of(context).textTheme.bodyLarge,
@@ -1954,7 +1974,8 @@ class _HomePageState extends State<HomePage> {
   // Helper method to format just time according to device settings
   static String _formatTime(BuildContext context, DateTime dateTime) {
     final MediaQueryData mediaQuery = MediaQuery.of(context);
-    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;    return is24HourFormat
+    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
+    return is24HourFormat
         ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
         : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
   }
@@ -2047,6 +2068,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
   Widget _buildBookedSpotCard(
     BuildContext context, {
     required String spotId,
@@ -2168,11 +2190,13 @@ class _HomePageState extends State<HomePage> {
                   // QR Scanner button
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _openQrScannerForBookedSpot(context, spotId, address),
+                      onPressed: () =>
+                          _openQrScannerForBookedSpot(context, spotId, address),
                       icon: const Icon(Icons.qr_code_scanner, size: 18),
                       label: const Text(
                         'Scan QR',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal.shade600,
@@ -2189,11 +2213,13 @@ class _HomePageState extends State<HomePage> {
                   // Unbook button
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _showUnbookingDialog(context, spotId, address, bookingId),
+                      onPressed: () => _showUnbookingDialog(
+                          context, spotId, address, bookingId),
                       icon: const Icon(Icons.close, size: 18),
                       label: const Text(
                         'Unbook',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange.shade600,
@@ -2216,7 +2242,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Method to open QR scanner for booked spots
-  void _openQrScannerForBookedSpot(BuildContext context, String spotId, String address) {
+  void _openQrScannerForBookedSpot(
+      BuildContext context, String spotId, String address) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => QrScannerPage(
@@ -2461,7 +2488,8 @@ class _HomePageState extends State<HomePage> {
             );
           }
         }
-      } else {        if (context.mounted) {
+      } else {
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -2472,7 +2500,8 @@ class _HomePageState extends State<HomePage> {
           );
         }
       }
-    }  }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2543,7 +2572,9 @@ class _HomePageState extends State<HomePage> {
                   const Text(
                     'Parking Manager',
                     style: TextStyle(color: Colors.white, fontSize: 20),
-                  ),                  const SizedBox(height: 5),                  FutureBuilder<String>(
+                  ),
+                  const SizedBox(height: 5),
+                  FutureBuilder<String>(
                     future: _getUserName(user),
                     builder: (context, snapshot) {
                       String name = snapshot.data ?? 'User';
@@ -2664,7 +2695,7 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.teal.shade600,
                   ),
                 ),
-                const SizedBox(height: 16),                // Current bookings section
+                const SizedBox(height: 16), // Current bookings section
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('bookings')
@@ -2675,12 +2706,14 @@ class _HomePageState extends State<HomePage> {
                     if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
                       final booking = snapshot.data!.docs.first;
                       final data = booking.data() as Map<String, dynamic>;
-                      final address = data['address'] as String? ?? 'No address';
-                      final startTime = (data['startTime'] as Timestamp).toDate();
+                      final address =
+                          data['address'] as String? ?? 'No address';
+                      final startTime =
+                          (data['startTime'] as Timestamp).toDate();
                       final timeString = _formatTime(context, startTime);
                       final spotId = data['spotId'] as String? ?? '';
                       final bookingId = booking.id;
-                      
+
                       // Get the spot's availableUntil time to calculate correct remaining time
                       return FutureBuilder<DocumentSnapshot>(
                         future: FirebaseFirestore.instance
@@ -2689,25 +2722,29 @@ class _HomePageState extends State<HomePage> {
                             .get(),
                         builder: (context, spotSnapshot) {
                           String remainingText = 'Loading...';
-                          
-                          if (spotSnapshot.hasData && spotSnapshot.data!.exists) {
-                            final spotData = spotSnapshot.data!.data() as Map<String, dynamic>;
-                            final availableUntilTimestamp = spotData['availableUntil'] as Timestamp?;
-                            
+
+                          if (spotSnapshot.hasData &&
+                              spotSnapshot.data!.exists) {
+                            final spotData = spotSnapshot.data!.data()
+                                as Map<String, dynamic>;
+                            final availableUntilTimestamp =
+                                spotData['availableUntil'] as Timestamp?;
+
                             if (availableUntilTimestamp != null) {
-                              final availableUntil = availableUntilTimestamp.toDate();
+                              final availableUntil =
+                                  availableUntilTimestamp.toDate();
                               final now = DateTime.now();
                               final remaining = availableUntil.difference(now);
-                              
-                              remainingText = remaining.isNegative 
-                                  ? 'Expired' 
+
+                              remainingText = remaining.isNegative
+                                  ? 'Expired'
                                   : '${remaining.inHours}h ${remaining.inMinutes % 60}m remaining';
                             } else {
                               remainingText = 'No time limit';
                             }
                           } else {
                             remainingText = 'Spot unavailable';
-                          }                          
+                          }
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -2761,7 +2798,8 @@ class _HomePageState extends State<HomePage> {
                     label: 'Book a Parking Spot',
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const BookSpotPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const BookSpotPage()),
                       );
                     },
                   ),
@@ -2773,7 +2811,8 @@ class _HomePageState extends State<HomePage> {
                     backgroundColor: Colors.orange.shade400,
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const ListSpotPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const ListSpotPage()),
                       );
                     },
                   ),
@@ -2831,17 +2870,17 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error getting user name: $e');
     }
-    
+
     // Fallback to display name or email
     if (user.displayName != null && user.displayName!.isNotEmpty) {
       return user.displayName!;
     }
-    
+
     // Final fallback to email username
     if (user.email != null && user.email!.contains('@')) {
       return user.email!.split('@')[0];
     }
-    
+
     return 'User';
   }
 }
@@ -2942,6 +2981,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
   LatLng? _selectedLatLng;
   String? _selectedAddress;
   GoogleMapController? _mapController; // Add map controller
+  CameraPosition?
+      _cameraPositionBeforeSelection; // Store camera position before spot selection
+  CameraPosition? _currentCameraPosition; // Track current camera position
 
   @override
   void initState() {
@@ -2967,7 +3009,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
     } catch (e) {
       print('Error getting user name: $e');
     }
-    
+
     // Fallback to display name or email
     if (user.displayName != null && user.displayName!.isNotEmpty) {
       return user.displayName!;
@@ -3010,7 +3052,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
 
       final spotData = spotDoc.data() as Map<String, dynamic>;
       final isAvailable = spotData['isAvailable'] == true;
-      final availableUntil = (spotData['availableUntil'] as Timestamp?)?.toDate();
+      final availableUntil =
+          (spotData['availableUntil'] as Timestamp?)?.toDate();
 
       if (!isAvailable) {
         setState(() {
@@ -3061,14 +3104,11 @@ class _BookSpotPageState extends State<BookSpotPage> {
             ),
             margin: const EdgeInsets.all(16),
           ),
+        ); // Redirect to homepage after successful booking
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (route) => false,
         );
-
-        // Clear selection and navigate back
-        setState(() {
-          _selectedSpotId = null;
-          _selectedLatLng = null;
-          _selectedAddress = null;
-        });
       }
     } catch (e) {
       setState(() {
@@ -3094,9 +3134,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
       target: LatLng(23.7624, 90.3785),
       zoom: 14,
     );
-  }
+  } // Method to move camera to selected spot
 
-  // Method to move camera to selected spot
   Future<void> _moveCameraToSpot(LatLng spotLocation) async {
     if (_mapController != null) {
       await _mapController!.animateCamera(
@@ -3106,6 +3145,15 @@ class _BookSpotPageState extends State<BookSpotPage> {
             zoom: 16, // Zoom in closer to the selected spot
           ),
         ),
+      );
+    }
+  }
+
+  // Method to restore camera to position before spot selection
+  Future<void> _restorePreviousCamera() async {
+    if (_mapController != null && _cameraPositionBeforeSelection != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(_cameraPositionBeforeSelection!),
       );
     }
   }
@@ -3214,10 +3262,12 @@ class _BookSpotPageState extends State<BookSpotPage> {
                       size: 35,
                     ),
                   ),
-                  const SizedBox(height: 10),                  const Text(
+                  const SizedBox(height: 10),
+                  const Text(
                     'Parking Manager',
                     style: TextStyle(color: Colors.white, fontSize: 20),
-                  ),                  const SizedBox(height: 5),
+                  ),
+                  const SizedBox(height: 5),
                   FutureBuilder<String>(
                     future: _getUserName(user!),
                     builder: (context, snapshot) {
@@ -3325,9 +3375,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: \\${snapshot.error}'));
+            }            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
             }
             final spots = snapshot.data?.docs ?? [];
 
@@ -3386,15 +3435,23 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure, // Blue for available spots
                     ),
-                    onTap: () {
+                    onTap: () async {
                       final spotLocation = LatLng(lat, lng);
+
+                      // Capture current camera position before moving to spot
+                      _cameraPositionBeforeSelection = _currentCameraPosition;
+
+                      // Move camera to center on the selected spot first
+                      await _moveCameraToSpot(spotLocation);
+
+                      // Then immediately restore to previous position while keeping spot selected
+                      await _restorePreviousCamera();
+
                       setState(() {
                         _selectedSpotId = spotId;
                         _selectedLatLng = spotLocation;
                         _selectedAddress = address;
                       });
-                      // Move camera to center on the selected spot
-                      _moveCameraToSpot(spotLocation);
                     },
                   ),
                 );
@@ -3565,6 +3622,12 @@ class _BookSpotPageState extends State<BookSpotPage> {
                           false, // Disable default to use custom button
                       onMapCreated: (GoogleMapController controller) async {
                         _mapController = controller;
+                        // Initialize current camera position
+                        _currentCameraPosition = initialPosition;
+                      },
+                      onCameraMove: (CameraPosition position) {
+                        // Track camera position changes
+                        _currentCameraPosition = position;
                       },
                       onTap: (_) {
                         setState(() {
@@ -3662,10 +3725,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
+                                  ),                                  const SizedBox(height: 8),
                                   Text(
-                                    'Lat: \\${_selectedLatLng!.latitude.toStringAsFixed(6)}, Lng: \\${_selectedLatLng!.longitude.toStringAsFixed(6)}',
+                                    'Lat: ${_selectedLatLng!.latitude.toStringAsFixed(6)}, Lng: ${_selectedLatLng!.longitude.toStringAsFixed(6)}',
                                     style: const TextStyle(fontSize: 13),
                                   ),
                                   const SizedBox(height: 16),
@@ -3688,8 +3750,11 @@ class _BookSpotPageState extends State<BookSpotPage> {
                                                 color: Colors.white,
                                               ),
                                             )
-                                          : const Icon(Icons.check_circle_outline),
-                                      label: Text(_isLoading ? 'BOOKING...' : 'Confirm Booking'),
+                                          : const Icon(
+                                              Icons.check_circle_outline),
+                                      label: Text(_isLoading
+                                          ? 'BOOKING...'
+                                          : 'Confirm Booking'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal[600],
                                         foregroundColor: Colors.white,

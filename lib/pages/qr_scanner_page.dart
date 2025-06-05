@@ -50,6 +50,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
       }
     }
   }
+
   void _showSuccessDialog() {
     showDialog(
       context: context,
@@ -71,6 +72,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
       ),
     );
   }
+
   void _showErrorDialog(String scannedCode) {
     showDialog(
       context: context,
@@ -79,7 +81,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
         title: const Text('Wrong QR Code'),
         content: Text(
           'The QR code you scanned does not match this parking spot at:\n${widget.address}\n\nPlease scan the correct QR code for this location.',
-        ),        actions: [
+        ),
+        actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
@@ -137,7 +140,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Column(                    children: [
+                  child: Column(
+                    children: [
                       Icon(Icons.qr_code_scanner,
                           size: 32, color: Colors.teal.shade700),
                       const SizedBox(height: 8),
@@ -178,7 +182,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   ),
                 ),
               ),
-            ),            // Bottom section with instructions only
+            ), // Bottom section with instructions only
             Expanded(
               flex: 1,
               child: Container(
