@@ -1,0 +1,372 @@
+/// Error handling utilities for the parking manager application
+/// Provides standardized error handling, logging, and user-friendly error messages
+library;
+
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+
+/// Custom exception classes for better error categorization
+class AppException implements Exception {
+  final String message;
+  final String? code;
+  final dynamic originalError;
+
+  const AppException(this.message, {this.code, this.originalError});
+
+  @override
+  String toString() => 'AppException: $message';
+}
+
+class AuthenticationException extends AppException {
+  const AuthenticationException(super.message,
+      {super.code, super.originalError});
+}
+
+class ValidationException extends AppException {
+  const ValidationException(super.message, {super.code, super.originalError});
+}
+
+class NetworkException extends AppException {
+  const NetworkException(super.message, {super.code, super.originalError});
+}
+
+class PermissionException extends AppException {
+  const PermissionException(super.message, {super.code, super.originalError});
+}
+
+class DataException extends AppException {
+  const DataException(super.message, {super.code, super.originalError});
+}
+
+/// Error handling utility class
+class ErrorHandler {
+  /// Log error for debugging (only in debug mode)
+  static void logError(
+    String context,
+    dynamic error, {
+    StackTrace? stackTrace,
+    Map<String, dynamic>? additionalData,
+  }) {
+    if (kDebugMode) {
+      print('🔴 Error in $context: $error');
+      if (stackTrace != null) {
+        print('Stack trace: $stackTrace');
+      }
+      if (additionalData != null) {
+        print('Additional data: $additionalData');
+      }
+    }
+
+    // In production, you might want to send errors to a crash reporting service
+    // like Firebase Crashlytics, Sentry, etc.
+  }
+
+  /// Convert Firebase Auth errors to user-friendly messages
+  static String getAuthErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'user-not-found':
+        return 'No user found with this email address.';
+      case 'wrong-password':
+        return 'Incorrect password. Please try again.';
+      case 'email-already-in-use':
+        return 'An account already exists with this email address.';
+      case 'weak-password':
+        return 'Password is too weak. Please choose a stronger password.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'too-many-requests':
+        return 'Too many failed attempts. Please try again later.';
+      case 'operation-not-allowed':
+        return 'This sign-in method is not enabled. Please contact support.';
+      case 'invalid-credential':
+        return 'Invalid credentials. Please check your email and password.';
+      case 'network-request-failed':
+        return 'Network error. Please check your internet connection.';
+      case 'requires-recent-login':
+        return 'Please sign in again to continue.';
+      default:
+        return 'Authentication failed: ${error.message ?? 'Unknown error'}';
+    }
+  }
+
+  /// Convert Firestore errors to user-friendly messages
+  static String getFirestoreErrorMessage(FirebaseException error) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'You don\'t have permission to perform this action.';
+      case 'unavailable':
+        return 'Service is currently unavailable. Please try again later.';
+      case 'not-found':
+        return 'The requested data was not found.';
+      case 'already-exists':
+        return 'This data already exists.';
+      case 'resource-exhausted':
+        return 'Service quota exceeded. Please try again later.';
+      case 'failed-precondition':
+        return 'Operation failed due to invalid state.';
+      case 'aborted':
+        return 'Operation was aborted. Please try again.';
+      case 'out-of-range':
+        return 'Invalid data range provided.';
+      case 'unimplemented':
+        return 'This feature is not yet implemented.';
+      case 'internal':
+        return 'Internal server error. Please try again later.';
+      case 'deadline-exceeded':
+        return 'Request timed out. Please try again.';
+      case 'unauthenticated':
+        return 'You must be signed in to perform this action.';
+      default:
+        return 'Database error: ${error.message ?? 'Unknown error'}';
+    }
+  }
+
+  /// Convert generic errors to user-friendly messages
+  static String getGenericErrorMessage(dynamic error) {
+    if (error is FirebaseAuthException) {
+      return getAuthErrorMessage(error);
+    } else if (error is FirebaseException) {
+      return getFirestoreErrorMessage(error);
+    } else if (error is AppException) {
+      return error.message;
+    } else if (error is Exception) {
+      return error.toString().replaceFirst('Exception: ', '');
+    } else {
+      return 'An unexpected error occurred. Please try again.';
+    }
+  }
+
+  /// Handle errors with logging and return user-friendly message
+  static String handleError(
+    String context,
+    dynamic error, {
+    StackTrace? stackTrace,
+    Map<String, dynamic>? additionalData,
+  }) {
+    logError(context, error,
+        stackTrace: stackTrace, additionalData: additionalData);
+    return getGenericErrorMessage(error);
+  }
+
+  /// Validate and throw appropriate exceptions
+  static void validateEmail(String? email) {
+    if (email == null || email.trim().isEmpty) {
+      throw const ValidationException('Email is required');
+    }
+
+    final emailRegex =
+        RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(email.trim())) {
+      throw const ValidationException('Please enter a valid email address');
+    }
+  }
+
+  static void validatePassword(String? password) {
+    if (password == null || password.isEmpty) {
+      throw const ValidationException('Password is required');
+    }
+
+    if (password.length < 6) {
+      throw const ValidationException(
+          'Password must be at least 6 characters long');
+    }
+  }
+
+  static void validateRequired(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) {
+      throw ValidationException('$fieldName is required');
+    }
+  }
+
+  static void validatePositiveNumber(double? value, String fieldName) {
+    if (value == null || value <= 0) {
+      throw ValidationException('$fieldName must be a positive number');
+    }
+  }
+
+  /// Network connectivity check helper
+  static bool isNetworkError(dynamic error) {
+    if (error is FirebaseException) {
+      return error.code == 'unavailable' ||
+          error.code == 'network-request-failed' ||
+          error.code == 'deadline-exceeded';
+    }
+    return false;
+  }
+
+  /// Permission error check helper
+  static bool isPermissionError(dynamic error) {
+    if (error is FirebaseException) {
+      return error.code == 'permission-denied' ||
+          error.code == 'unauthenticated';
+    }
+    return false;
+  }
+
+  /// Check if error requires user re-authentication
+  static bool requiresReAuthentication(dynamic error) {
+    if (error is FirebaseAuthException) {
+      return error.code == 'requires-recent-login';
+    }
+    return false;
+  }
+}
+
+/// Result wrapper for operations that might fail
+class Result<T> {
+  final T? data;
+  final String? error;
+  final bool isSuccess;
+
+  const Result.success(this.data)
+      : error = null,
+        isSuccess = true;
+  const Result.error(this.error)
+      : data = null,
+        isSuccess = false;
+
+  /// Execute a function and wrap result
+  static Future<Result<T>> execute<T>(Future<T> Function() operation) async {
+    try {
+      final result = await operation();
+      return Result.success(result);
+    } catch (error, stackTrace) {
+      final errorMessage = ErrorHandler.handleError(
+        'Result.execute',
+        error,
+        stackTrace: stackTrace,
+      );
+      return Result.error(errorMessage);
+    }
+  }
+
+  /// Execute a function and wrap result with custom error handling
+  static Future<Result<T>> executeWithCustomError<T>(
+    Future<T> Function() operation,
+    String Function(dynamic error) errorHandler,
+  ) async {
+    try {
+      final result = await operation();
+      return Result.success(result);
+    } catch (error, stackTrace) {
+      ErrorHandler.logError('Result.executeWithCustomError', error,
+          stackTrace: stackTrace);
+      final errorMessage = errorHandler(error);
+      return Result.error(errorMessage);
+    }
+  }
+}
+
+/// Async operation wrapper with retry logic
+class AsyncOperation {
+  /// Execute operation with retry logic
+  static Future<T> withRetry<T>(
+    Future<T> Function() operation, {
+    int maxRetries = 3,
+    Duration delay = const Duration(seconds: 1),
+    bool Function(dynamic error)? shouldRetry,
+  }) async {
+    int attempts = 0;
+
+    while (attempts < maxRetries) {
+      try {
+        return await operation();
+      } catch (error) {
+        attempts++;
+
+        if (attempts >= maxRetries) {
+          rethrow;
+        }
+
+        // Check if we should retry this error
+        if (shouldRetry != null && !shouldRetry(error)) {
+          rethrow;
+        }
+
+        // Don't retry permission errors or validation errors
+        if (ErrorHandler.isPermissionError(error) ||
+            error is ValidationException) {
+          rethrow;
+        }
+
+        ErrorHandler.logError(
+          'AsyncOperation.withRetry',
+          error,
+          additionalData: {'attempt': attempts, 'maxRetries': maxRetries},
+        );
+
+        await Future.delayed(delay * attempts);
+      }
+    }
+
+    throw Exception('Operation failed after $maxRetries attempts');
+  }
+
+  /// Execute operation with timeout
+  static Future<T> withTimeout<T>(
+    Future<T> Function() operation, {
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    try {
+      return await operation().timeout(timeout);
+    } catch (error) {
+      if (error is TimeoutException) {
+        throw const NetworkException('Operation timed out. Please try again.');
+      }
+      rethrow;
+    }
+  }
+
+  /// Execute operation with both retry and timeout
+  static Future<T> withRetryAndTimeout<T>(
+    Future<T> Function() operation, {
+    int maxRetries = 3,
+    Duration delay = const Duration(seconds: 1),
+    Duration timeout = const Duration(seconds: 30),
+    bool Function(dynamic error)? shouldRetry,
+  }) async {
+    return withRetry(
+      () => withTimeout(operation, timeout: timeout),
+      maxRetries: maxRetries,
+      delay: delay,
+      shouldRetry: shouldRetry,
+    );
+  }
+}
+
+/// Error boundary for widgets (conceptual - would need custom implementation)
+class ErrorBoundary {
+  /// Standard error messages for common scenarios
+  static const String noInternetConnection =
+      'No internet connection. Please check your network settings.';
+  static const String serverError = 'Server error. Please try again later.';
+  static const String notFound = 'The requested item was not found.';
+  static const String unauthorized =
+      'You are not authorized to perform this action.';
+  static const String validationFailed =
+      'Please check your input and try again.';
+  static const String unknownError =
+      'An unexpected error occurred. Please try again.';
+
+  /// Get appropriate error message for common scenarios
+  static String getStandardMessage(String errorType) {
+    switch (errorType.toLowerCase()) {
+      case 'network':
+        return noInternetConnection;
+      case 'server':
+        return serverError;
+      case 'notfound':
+        return notFound;
+      case 'unauthorized':
+        return unauthorized;
+      case 'validation':
+        return validationFailed;
+      default:
+        return unknownError;
+    }
+  }
+}
