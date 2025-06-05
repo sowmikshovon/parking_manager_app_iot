@@ -21,7 +21,7 @@ class LocationService {
   static Future<Position?> getCurrentLocation() async {
     try {
       print('LocationService: Starting location request...');
-      
+
       // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       print('LocationService: Location services enabled: $serviceEnabled');
@@ -33,7 +33,7 @@ class LocationService {
       // Check location permission
       LocationPermission permission = await Geolocator.checkPermission();
       print('LocationService: Current permission status: $permission');
-      
+
       if (permission == LocationPermission.denied) {
         print('LocationService: Requesting location permission...');
         permission = await Geolocator.requestPermission();
@@ -42,8 +42,10 @@ class LocationService {
           print('Location permissions are denied');
           return null;
         }
-      }      if (permission == LocationPermission.deniedForever) {
-        print('Location permissions are permanently denied, we cannot request permissions.');
+      }
+      if (permission == LocationPermission.deniedForever) {
+        print(
+            'Location permissions are permanently denied, we cannot request permissions.');
         // For permanently denied permissions, we could open app settings
         return null;
       }
@@ -54,7 +56,7 @@ class LocationService {
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 15), // Increased timeout
       );
-      
+
       print('Location obtained: ${position.latitude}, ${position.longitude}');
       return position;
     } catch (e) {
@@ -1280,7 +1282,9 @@ class _ListSpotPageState extends State<ListSpotPage> {
     } // Fallback to default coordinates if location is not available
     return const CameraPosition(
       target: LatLng(23.7624, 90.3785),
-      zoom: 14,    );  }
+      zoom: 14,
+    );
+  }
 
   // Method to move camera to user location
   Future<void> _moveToUserLocation() async {
@@ -1303,18 +1307,20 @@ class _ListSpotPageState extends State<ListSpotPage> {
       // Show user-friendly error message based on error type
       if (mounted) {
         String errorMessage = 'Could not get your location.';
-        
-        if (e.toString().contains('No location permissions') || 
+
+        if (e.toString().contains('No location permissions') ||
             e.toString().contains('permissions')) {
-          errorMessage = 'Location permission required. Please enable location access in Settings.';
-        } else if (e.toString().contains('Location services') || 
-                   e.toString().contains('disabled')) {
-          errorMessage = 'Location services are disabled. Please enable them in Settings.';
-        } else if (e.toString().contains('timeout') || 
-                   e.toString().contains('TimeoutException')) {
+          errorMessage =
+              'Location permission required. Please enable location access in Settings.';
+        } else if (e.toString().contains('Location services') ||
+            e.toString().contains('disabled')) {
+          errorMessage =
+              'Location services are disabled. Please enable them in Settings.';
+        } else if (e.toString().contains('timeout') ||
+            e.toString().contains('TimeoutException')) {
           errorMessage = 'Location request timed out. Please try again.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -1345,7 +1351,8 @@ class _ListSpotPageState extends State<ListSpotPage> {
               const CameraPosition(
                 target: LatLng(23.7624, 90.3785),
                 zoom: 14,
-              );          return Stack(
+              );
+          return Stack(
             children: [
               GoogleMap(
                 initialCameraPosition: initialPosition,
@@ -1363,7 +1370,8 @@ class _ListSpotPageState extends State<ListSpotPage> {
                   });
                 },
                 myLocationEnabled: true,
-                myLocationButtonEnabled: false, // Disable default to use custom button
+                myLocationButtonEnabled:
+                    false, // Disable default to use custom button
                 onMapCreated: (GoogleMapController controller) async {
                   _mapController = controller; // Store controller reference
                 },
@@ -2965,28 +2973,45 @@ class _HomePageState extends State<HomePage> {
                                                     });
                                                     return const SizedBox
                                                         .shrink(); // Hide this booking from UI
-                                                  }                                                  // Calculate remaining time until end and handle expiration
+                                                  } // Calculate remaining time until end and handle expiration
                                                   String remainingTime =
                                                       'Unknown';
                                                   if (bookingTime != null) {
                                                     DateTime? endTime;
-                                                    
+
                                                     if (spotSnapshot.hasData &&
-                                                        spotSnapshot.data!.exists) {
-                                                      final spotData = spotSnapshot.data!.data() as Map<String, dynamic>?;
-                                                      final availableUntilTimestamp = spotData?['availableUntil'] as Timestamp?;
-                                                      
-                                                      if (availableUntilTimestamp != null) {
+                                                        spotSnapshot
+                                                            .data!.exists) {
+                                                      final spotData =
+                                                          spotSnapshot.data!
+                                                                  .data()
+                                                              as Map<String,
+                                                                  dynamic>?;
+                                                      final availableUntilTimestamp =
+                                                          spotData?[
+                                                                  'availableUntil']
+                                                              as Timestamp?;
+
+                                                      if (availableUntilTimestamp !=
+                                                          null) {
                                                         // Use the actual availableUntil time from the parking spot
-                                                        endTime = availableUntilTimestamp.toDate().toLocal();
+                                                        endTime =
+                                                            availableUntilTimestamp
+                                                                .toDate()
+                                                                .toLocal();
                                                       }
                                                     }
-                                                    
+
                                                     // Fallback to 24 hours if no availableUntil is found
-                                                    endTime ??= bookingTime.toDate().toLocal().add(const Duration(hours: 24));
-                                                    
+                                                    endTime ??= bookingTime
+                                                        .toDate()
+                                                        .toLocal()
+                                                        .add(const Duration(
+                                                            hours: 24));
+
                                                     final now = DateTime.now();
-                                                    final difference = endTime.difference(now);
+                                                    final difference =
+                                                        endTime.difference(now);
 
                                                     if (difference.isNegative) {
                                                       // Automatically expire the booking
@@ -3183,7 +3208,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
   LatLng? _selectedLatLng;
   String? _selectedAddress;
   GoogleMapController? _mapController; // Add map controller
-  
+
   @override
   void initState() {
     super.initState();
@@ -3203,7 +3228,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
     return const CameraPosition(
       target: LatLng(23.7624, 90.3785),
       zoom: 14,
-    );  }
+    );
+  }
+
   // Add method to move camera to selected spot
   Future<void> _moveCameraToSpot(LatLng spotLocation) async {
     if (_mapController != null) {
@@ -3214,7 +3241,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
             zoom: 16, // Zoom in closer to the selected spot
           ),
         ),
-      );    }  }
+      );
+    }
+  }
 
   // Method to move camera to user location
   Future<void> _moveToUserLocation() async {
@@ -3237,18 +3266,20 @@ class _BookSpotPageState extends State<BookSpotPage> {
       // Show user-friendly error message based on error type
       if (mounted) {
         String errorMessage = 'Could not get your location.';
-        
-        if (e.toString().contains('No location permissions') || 
+
+        if (e.toString().contains('No location permissions') ||
             e.toString().contains('permissions')) {
-          errorMessage = 'Location permission required. Please enable location access in Settings.';
-        } else if (e.toString().contains('Location services') || 
-                   e.toString().contains('disabled')) {
-          errorMessage = 'Location services are disabled. Please enable them in Settings.';
-        } else if (e.toString().contains('timeout') || 
-                   e.toString().contains('TimeoutException')) {
+          errorMessage =
+              'Location permission required. Please enable location access in Settings.';
+        } else if (e.toString().contains('Location services') ||
+            e.toString().contains('disabled')) {
+          errorMessage =
+              'Location services are disabled. Please enable them in Settings.';
+        } else if (e.toString().contains('timeout') ||
+            e.toString().contains('TimeoutException')) {
           errorMessage = 'Location request timed out. Please try again.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -3584,7 +3615,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     infoWindow: InfoWindow(title: address),
                     icon: BitmapDescriptor.defaultMarkerWithHue(
                       BitmapDescriptor.hueAzure, // Blue for available spots
-                    ),                    onTap: () {
+                    ),
+                    onTap: () {
                       final spotLocation = LatLng(lat, lng);
                       setState(() {
                         _selectedSpotId = spotId;
@@ -3665,7 +3697,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
               return const Center(
                 child: Text('No parking spots found at the moment.'),
               );
-            }            if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
+            }
+            if (availableSpots.isEmpty && expiredSpots.isNotEmpty) {
               return FutureBuilder<CameraPosition>(
                 future: _getInitialCameraPosition(),
                 builder: (context, cameraSnapshot) {
@@ -3678,13 +3711,15 @@ class _BookSpotPageState extends State<BookSpotPage> {
                       const CameraPosition(
                         target: LatLng(23.7624, 90.3785),
                         zoom: 14,
-                      );                  return Stack(
+                      );
+                  return Stack(
                     children: [
                       GoogleMap(
                         initialCameraPosition: initialPosition,
                         markers: markers,
                         myLocationEnabled: true,
-                        myLocationButtonEnabled: false, // Disable default to use custom button
+                        myLocationButtonEnabled:
+                            false, // Disable default to use custom button
                         onMapCreated: (GoogleMapController controller) async {
                           _mapController = controller;
                         },
@@ -3737,7 +3772,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
                   );
                 },
               );
-            }            return FutureBuilder<CameraPosition>(
+            }
+            return FutureBuilder<CameraPosition>(
               future: _getInitialCameraPosition(),
               builder: (context, cameraSnapshot) {
                 if (cameraSnapshot.connectionState == ConnectionState.waiting) {
@@ -3748,13 +3784,15 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     const CameraPosition(
                       target: LatLng(23.7624, 90.3785),
                       zoom: 14,
-                    );                return Stack(
+                    );
+                return Stack(
                   children: [
                     GoogleMap(
                       initialCameraPosition: initialPosition,
                       markers: markers,
                       myLocationEnabled: true,
-                      myLocationButtonEnabled: false, // Disable default to use custom button
+                      myLocationButtonEnabled:
+                          false, // Disable default to use custom button
                       onMapCreated: (GoogleMapController controller) async {
                         _mapController = controller;
                       },
