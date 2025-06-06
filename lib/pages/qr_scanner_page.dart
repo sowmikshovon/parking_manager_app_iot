@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../utils/app_constants.dart';
+
 class QrScannerPage extends StatefulWidget {
   final String expectedSpotId;
   final String address;
@@ -57,8 +59,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
-        title: const Text('QR Code Verified!'),
-        content: Text('Parking spot verified at:\n${widget.address}'),
+        title: const Text(AppStrings.qrCodeVerified),
+        content: Text('${AppStrings.parkingSpotVerified}\n${widget.address}'),
         actions: [
           ElevatedButton(
             onPressed: () {
@@ -66,7 +68,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
               Navigator.of(context).pop(); // Close scanner
               widget.onSuccess();
             },
-            child: const Text('Continue Booking'),
+            child: const Text(AppStrings.continueBooking),
           ),
         ],
       ),
@@ -78,10 +80,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.error, color: Colors.red, size: 48),
-        title: const Text('Wrong QR Code'),
-        content: Text(
-          'The QR code you scanned does not match this parking spot at:\n${widget.address}\n\nPlease scan the correct QR code for this location.',
-        ),
+        title: const Text(AppStrings.wrongQrCode),
+        content: Text(AppStrings.qrCodeMismatch),
         actions: [
           TextButton(
             onPressed: () {
@@ -90,7 +90,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                 _isProcessing = false;
               });
             },
-            child: const Text('Try Again'),
+            child: const Text(AppStrings.tryAgain),
           ),
         ],
       ),
@@ -101,7 +101,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan QR Code'),
+        title: const Text(AppStrings.scanQrCode),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
         actions: [
@@ -146,7 +146,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                           size: 32, color: Colors.teal.shade700),
                       const SizedBox(height: 8),
                       Text(
-                        'Scan QR Code for:',
+                        AppStrings.scanQrCodeFor,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -192,7 +192,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Point your camera at the QR code',
+                      AppStrings.pointCameraAtQrCode,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -223,7 +223,7 @@ class QrInstructionCard extends StatelessWidget {
             Icon(Icons.qr_code_scanner, size: 32, color: Colors.teal.shade700),
             const SizedBox(height: 8),
             Text(
-              'Scan QR Code for:',
+              AppStrings.scanQrCodeFor,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

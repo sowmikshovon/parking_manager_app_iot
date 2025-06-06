@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/location_service.dart';
 import '../services/expired_spot_tracker.dart';
+import '../services/error_service.dart';
 import '../utils/snackbar_utils.dart';
+import '../utils/app_constants.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
 import 'home_page.dart';
@@ -35,24 +37,30 @@ class _BookSpotPageState extends State<BookSpotPage> {
     super.initState();
     // Trigger an immediate check when the page loads
     ExpiredSpotTracker.checkAndUpdateExpiredSpots();
-  }
-
-  // Method to get user name for display
+  }  // Method to get user name for display
   Future<String> _getUserName(User user) async {
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (userDoc.exists && userDoc.data() != null) {
-        final data = userDoc.data()!;
-        final name = data['name'] as String? ?? '';
-        if (name.isNotEmpty) {
-          return name;
+    final result = await ErrorService.executeWithErrorHandling<String>(
+      context,
+      () async {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final data = userDoc.data()!;
+          final name = data['name'] as String? ?? '';
+          if (name.isNotEmpty) {
+            return name;
+          }
         }
-      }
-    } catch (e) {
-      print('Error getting user name: $e');
+        throw Exception('User name not found');
+      },
+      operationName: AppStrings.getUserNameOperation,
+      showSnackBar: false, // Silent operation for background user name fetching
+    );
+
+    if (result != null) {
+      return result;
     }
 
     // Fallback to display name or email
@@ -62,15 +70,14 @@ class _BookSpotPageState extends State<BookSpotPage> {
     if (user.email != null && user.email!.contains('@')) {
       return user.email!.split('@')[0];
     }
-    return 'User';
+    return AppStrings.defaultUserName;
   }
-
   // Method to book a parking spot
   Future<void> _bookSpot(String spotId, String address) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       setState(() {
-        _error = 'You must be logged in to book a spot.';
+        _error = AppStrings.mustBeLoggedInToBook;
       });
       return;
     }
@@ -80,72 +87,70 @@ class _BookSpotPageState extends State<BookSpotPage> {
       _error = null;
     });
 
-    try {
-      // Check if spot is still available
-      final spotDoc = await FirebaseFirestore.instance
-          .collection('parking_spots')
-          .doc(spotId)
-          .get();
+    final result = await ErrorService.executeWithErrorHandling<bool>(
+      context,
+      () async {
+        // Check if spot is still available
+        final spotDoc = await FirebaseFirestore.instance
+            .collection('parking_spots')
+            .doc(spotId)
+            .get();
 
-      if (!spotDoc.exists) {
-        setState(() {
-          _error = 'This parking spot is no longer available.';
-          _isLoading = false;
+        if (!spotDoc.exists) {
+          throw Exception(AppStrings.parkingSpotNoLongerAvailable2);
+        }
+
+        final spotData = spotDoc.data() as Map<String, dynamic>;
+        final isAvailable = spotData['isAvailable'] == true;
+        final availableUntil =
+            (spotData['availableUntil'] as Timestamp?)?.toDate();
+
+        if (!isAvailable) {
+          throw Exception(AppStrings.parkingSpotAlreadyBooked);
+        }
+
+        if (availableUntil != null && availableUntil.isBefore(DateTime.now())) {
+          throw Exception(AppStrings.parkingSpotExpired);
+        }
+
+        // Create booking
+        await FirebaseFirestore.instance.collection('bookings').add({
+          'userId': user.uid,
+          'spotId': spotId,
+          'address': address,
+          'startTime': Timestamp.now(),
+          'status': AppStrings.activeStatus,
+          'userEmail': user.email,
         });
-        return;
-      }
 
-      final spotData = spotDoc.data() as Map<String, dynamic>;
-      final isAvailable = spotData['isAvailable'] == true;
-      final availableUntil =
-          (spotData['availableUntil'] as Timestamp?)?.toDate();
+        // Mark spot as booked
+        await FirebaseFirestore.instance
+            .collection('parking_spots')
+            .doc(spotId)
+            .update({'isAvailable': false});
 
-      if (!isAvailable) {
-        setState(() {
-          _error = 'This parking spot has already been booked.';
-          _isLoading = false;
-        });
-        return;
-      }
+        return true;
+      },
+      operationName: AppStrings.bookParkingSpotOperation,
+      showSnackBar: true,
+    );
 
-      if (availableUntil != null && availableUntil.isBefore(DateTime.now())) {
-        setState(() {
-          _error = 'This parking spot has expired.';
-          _isLoading = false;
-        });
-        return;
-      }
+    setState(() {
+      _isLoading = false;
+    });
 
-      // Create booking
-      await FirebaseFirestore.instance.collection('bookings').add({
-        'userId': user.uid,
-        'spotId': spotId,
-        'address': address,
-        'startTime': Timestamp.now(),
-        'status': 'active',
-        'userEmail': user.email,
-      });
-
-      // Mark spot as booked
-      await FirebaseFirestore.instance
-          .collection('parking_spots')
-          .doc(spotId)
-          .update({'isAvailable': false});
+    if (result != null && result == true) {
       if (mounted) {
-        SnackBarUtils.showSuccess(context, 'Parking spot booked successfully!');
+        SnackBarUtils.showSuccess(context, AppStrings.bookingSuccessful);
         // Redirect to homepage after successful booking
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const HomePage()),
           (route) => false,
         );
       }
-    } catch (e) {
+    } else {
       setState(() {
-        _error = 'Failed to book parking spot: ${e.toString()}';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
+        _error = AppStrings.failedToBookSpot;
       });
     }
   }
@@ -186,50 +191,24 @@ class _BookSpotPageState extends State<BookSpotPage> {
       );
     }
   }
-
   // Method to move camera to user location
   Future<void> _moveToUserLocation() async {
-    try {
-      if (_mapController != null) {
-        await LocationService.moveToUserLocation(_mapController!);
-      } else {
-        print('Map controller is not initialized');
-        if (mounted) {
-          SnackBarUtils.showWarning(
-              context, 'Map is not ready yet. Please try again.');
-        }
+    if (_mapController == null) {
+      if (mounted) {        SnackBarUtils.showWarning(
+            context, AppStrings.mapNotReady);
       }
-    } catch (e) {
-      print('Error in _moveToUserLocation: $e');
-      // Show user-friendly error message based on error type
-      if (mounted) {
-        String errorMessage = 'Could not get your location.';
-
-        if (e.toString().contains('No location permissions') ||
-            e.toString().contains('permissions')) {
-          errorMessage =
-              'Location permission required. Please enable location access in Settings.';
-        } else if (e.toString().contains('Location services') ||
-            e.toString().contains('disabled')) {
-          errorMessage =
-              'Location services are disabled. Please enable them in Settings.';
-        } else if (e.toString().contains('timeout') ||
-            e.toString().contains('TimeoutException')) {
-          errorMessage = 'Location request timed out. Please try again.';
-        }
-        SnackBarUtils.showCustom(
-          context,
-          errorMessage,
-          backgroundColor: Colors.red,
-          icon: Icons.error,
-          action: SnackBarAction(
-            label: 'Retry',
-            textColor: Colors.white,
-            onPressed: () => _moveToUserLocation(),
-          ),
-        );
-      }
+      return;
     }
+
+    await ErrorService.executeWithErrorHandling<void>(
+      context,
+      () async {
+        await LocationService.moveToUserLocation(_mapController!);
+      },
+      operationName: AppStrings.getUserLocationOperation,
+      showSnackBar: true,
+      onRetry: _moveToUserLocation,
+    );
   }
 
   @override
@@ -238,12 +217,12 @@ class _BookSpotPageState extends State<BookSpotPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Book a Parking Spot'),
+        title: Text(AppStrings.bookAParkingSpot),
         actions: [
           // Profile Button
           IconButton(
             icon: const Icon(Icons.account_circle, color: Colors.white),
-            tooltip: 'Profile',
+            tooltip: AppStrings.profileTooltip,
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const ProfilePage()),
@@ -253,7 +232,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
           // Logout Button
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
+            tooltip: AppStrings.logoutTooltip,
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {

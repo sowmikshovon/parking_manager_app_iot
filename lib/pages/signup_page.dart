@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/error_service.dart';
 import '../utils/snackbar_utils.dart';
+import '../utils/app_constants.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -24,13 +26,12 @@ class _SignUpPageState extends State<SignUpPage> {
   String? _lastNameError;
   String? _emailError;
   String? _passwordError;
-
   void _validateFirstName(String value) {
     setState(() {
       if (value.trim().isEmpty) {
-        _firstNameError = 'First name is required';
+        _firstNameError = AppStrings.firstNameRequired;
       } else if (value.trim().length < 2) {
-        _firstNameError = 'First name must be at least 2 characters';
+        _firstNameError = AppStrings.firstNameMinLength;
       } else {
         _firstNameError = null;
       }
@@ -40,9 +41,9 @@ class _SignUpPageState extends State<SignUpPage> {
   void _validateLastName(String value) {
     setState(() {
       if (value.trim().isEmpty) {
-        _lastNameError = 'Last name is required';
+        _lastNameError = AppStrings.lastNameRequired;
       } else if (value.trim().length < 2) {
-        _lastNameError = 'Last name must be at least 2 characters';
+        _lastNameError = AppStrings.lastNameMinLength;
       } else {
         _lastNameError = null;
       }
@@ -52,10 +53,10 @@ class _SignUpPageState extends State<SignUpPage> {
   void _validateEmail(String value) {
     setState(() {
       if (value.trim().isEmpty) {
-        _emailError = 'Email is required';
+        _emailError = AppStrings.emailRequired;
       } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
           .hasMatch(value.trim())) {
-        _emailError = 'Please enter a valid email address';
+        _emailError = AppStrings.validEmailRequired;
       } else {
         _emailError = null;
       }
@@ -65,9 +66,9 @@ class _SignUpPageState extends State<SignUpPage> {
   void _validatePassword(String value) {
     setState(() {
       if (value.isEmpty) {
-        _passwordError = 'Password is required';
+        _passwordError = AppStrings.requiredField;
       } else if (value.length < 6) {
-        _passwordError = 'Password must be at least 6 characters';
+        _passwordError = AppStrings.invalidPassword;
       } else {
         _passwordError = null;
       }
@@ -101,72 +102,54 @@ class _SignUpPageState extends State<SignUpPage> {
       _error = null;
     });
 
-    try {
-      // Create user account
-      final UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+    final result = await ErrorService.executeWithErrorHandling<User?>(
+      context,
+      () async {
+        // Create user account
+        final UserCredential userCredential =
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
-      final User? user = userCredential.user;
-      if (user != null) {
-        // Save additional user data to Firestore
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'name':
-              '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-          'email': user.email,
-        });
-      }
+        final User? user = userCredential.user;
+        if (user != null) {
+          // Save additional user data to Firestore
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'name':
+                '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+            'email': user.email,
+          });
+        }
+        return user;
+      },
+      operationName: AppStrings.createAccount,
+      showSnackBar: false, // We'll handle UI updates manually
+    );
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (result != null) {
       if (mounted) {
         Navigator.pop(context); // Go back to LoginPage
-        SnackBarUtils.showSuccess(
-            context, 'Sign up successful! Please log in.');
+        SnackBarUtils.showSuccess(context, AppStrings.signUpSuccessful);
       }
-    } on FirebaseAuthException catch (e) {
+    } else {
       setState(() {
-        switch (e.code) {
-          case 'email-already-in-use':
-            _error =
-                'This email address is already registered. Please use a different email or try logging in.';
-            break;
-          case 'weak-password':
-            _error =
-                'The password is too weak. Please choose a stronger password.';
-            break;
-          case 'invalid-email':
-            _error =
-                'The email address is not valid. Please enter a valid email.';
-            break;
-          case 'operation-not-allowed':
-            _error =
-                'Email/password accounts are not enabled. Please contact support.';
-            break;
-          case 'network-request-failed':
-            _error =
-                'Network error. Please check your internet connection and try again.';
-            break;
-          default:
-            _error = e.message ?? "Sign up failed. Please try again.";
-        }
+        _error = AppStrings.signUpFailed;
       });
-    } catch (e) {
-      setState(() {
-        _error = "An unexpected error occurred. Please try again.";
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign Up')),
+      appBar: AppBar(title: const Text(AppStrings.signUp)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
@@ -178,7 +161,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Create Account',
+                    AppStrings.createAccount,
                     style: Theme.of(context).textTheme.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
@@ -186,7 +169,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   TextField(
                     controller: _firstNameController,
                     decoration: InputDecoration(
-                      labelText: 'First Name',
+                      labelText: AppStrings.firstName,
                       prefixIcon: const Icon(Icons.person_outline),
                       errorText: _firstNameError,
                     ),
@@ -196,7 +179,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   TextField(
                     controller: _lastNameController,
                     decoration: InputDecoration(
-                      labelText: 'Last Name',
+                      labelText: AppStrings.lastName,
                       prefixIcon: const Icon(Icons.person),
                       errorText: _lastNameError,
                     ),
@@ -206,7 +189,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   TextField(
                     controller: _emailController,
                     decoration: InputDecoration(
-                      labelText: 'Email',
+                      labelText: AppStrings.email,
                       prefixIcon: const Icon(Icons.email_outlined),
                       errorText: _emailError,
                     ),
@@ -217,7 +200,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   TextField(
                     controller: _passwordController,
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                      labelText: AppStrings.password,
                       prefixIcon: const Icon(Icons.lock_outline),
                       errorText: _passwordError,
                       suffixIcon: IconButton(
@@ -258,7 +241,7 @@ class _SignUpPageState extends State<SignUpPage> {
                               ),
                             ),
                           )
-                        : const Text('Sign Up'),
+                        : const Text(AppStrings.signUp),
                   ),
                 ],
               ),

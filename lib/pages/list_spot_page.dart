@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/location_service.dart';
+import '../services/error_service.dart';
 import '../utils/snackbar_utils.dart';
 import 'address_entry_page.dart';
+import '../utils/app_constants.dart';
 
 class ListSpotPage extends StatefulWidget {
   const ListSpotPage({super.key});
@@ -27,57 +29,30 @@ class _ListSpotPageState extends State<ListSpotPage> {
       target: LatLng(23.7624, 90.3785),
       zoom: 14,
     );
-  }
-
-  // Method to move camera to user location
+  }  // Method to move camera to user location
   Future<void> _moveToUserLocation() async {
-    try {
-      if (_mapController != null) {
-        await LocationService.moveToUserLocation(_mapController!);
-      } else {
-        print('Map controller is not initialized');
-        if (mounted) {
-          SnackBarUtils.showWarning(
-              context, 'Map is not ready yet. Please try again.');
+    await ErrorService.executeWithErrorHandling(
+      context,
+      () async {
+        if (_mapController != null) {
+          await LocationService.moveToUserLocation(_mapController!);
+        } else {
+          // print('Map controller is not initialized');
+          if (mounted) {
+            SnackBarUtils.showWarning(
+                context, AppStrings.mapNotReady);
+          }
         }
-      }
-    } catch (e) {
-      print('Error in _moveToUserLocation: $e');
-      // Show user-friendly error message based on error type
-      if (mounted) {
-        String errorMessage = 'Could not get your location.';
-
-        if (e.toString().contains('No location permissions') ||
-            e.toString().contains('permissions')) {
-          errorMessage =
-              'Location permission required. Please enable location access in Settings.';
-        } else if (e.toString().contains('Location services') ||
-            e.toString().contains('disabled')) {
-          errorMessage =
-              'Location services are disabled. Please enable them in Settings.';
-        } else if (e.toString().contains('timeout') ||
-            e.toString().contains('TimeoutException')) {
-          errorMessage = 'Location request timed out. Please try again.';
-        }
-        SnackBarUtils.showCustom(
-          context,
-          errorMessage,
-          backgroundColor: Colors.red,
-          icon: Icons.error,
-          action: SnackBarAction(
-            label: 'Retry',
-            textColor: Colors.white,
-            onPressed: () => _moveToUserLocation(),
-          ),
-        );
-      }
-    }
+      },
+      operationName: AppStrings.getUserLocationOperation,
+      onRetry: _moveToUserLocation,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Select Location')),
+      appBar: AppBar(title: Text(AppStrings.selectLocation)),
       body: FutureBuilder<CameraPosition>(
         future: _getInitialCameraPosition(),
         builder: (context, cameraSnapshot) {
@@ -123,7 +98,7 @@ class _ListSpotPageState extends State<ListSpotPage> {
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.teal,
                   onPressed: _moveToUserLocation,
-                  tooltip: 'My Location',
+                  tooltip: AppStrings.myLocationTooltip,
                   child: const Icon(Icons.my_location),
                 ),
               ),
@@ -149,7 +124,7 @@ class _ListSpotPageState extends State<ListSpotPage> {
                           ),
                         );
                       },
-                      child: const Text('Next'),
+                      child: Text(AppStrings.nextButtonLabel),
                     ),
                   ),
                 ),

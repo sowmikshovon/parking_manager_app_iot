@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/expired_spot_tracker.dart';
 import '../services/dialog_service.dart';
+import '../services/error_service.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/date_time_utils.dart';
+import '../utils/app_constants.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
 import 'qr_scanner_page.dart';
@@ -20,8 +22,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  @override
+class _HomePageState extends State<HomePage> {  @override
   void initState() {
     super.initState();
     // Check for expired spots once when page loads
@@ -31,11 +32,14 @@ class _HomePageState extends State<HomePage> {
 
   // Check expired spots once when page loads using global tracker
   Future<void> _checkExpiredSpotsOnLoad() async {
-    try {
-      await ExpiredSpotTracker.checkAndUpdateExpiredSpots();
-    } catch (e) {
-      print('Error checking expired spots on HomePage load: $e');
-    }
+    await ErrorService.executeWithErrorHandling<void>(
+      context,
+      () async {
+        await ExpiredSpotTracker.checkAndUpdateExpiredSpots();
+      },
+      operationName: AppStrings.checkExpiredSpotsOperation,
+      showSnackBar: false, // Silent background operation
+    );
   }
 
   Widget _buildHomeButton(
@@ -206,9 +210,8 @@ class _HomePageState extends State<HomePage> {
                               size: 14,
                               color: Colors.orange.shade600,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Booked at $timeString',
+                            const SizedBox(width: 4),                            Text(
+                              AppStrings.bookedAtPrefix + timeString,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.orange.shade700,
@@ -250,9 +253,8 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton.icon(
                       onPressed: () =>
                           _openQrScannerForBookedSpot(context, spotId, address),
-                      icon: const Icon(Icons.qr_code_scanner, size: 18),
-                      label: const Text(
-                        'Scan QR',
+                      icon: const Icon(Icons.qr_code_scanner, size: 18),                      label: Text(
+                        AppStrings.scanQrCodeMenuItem,
                         style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600),
                       ),
@@ -273,9 +275,8 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton.icon(
                       onPressed: () => _showUnbookingDialog(
                           context, spotId, address, bookingId),
-                      icon: const Icon(Icons.close, size: 18),
-                      label: const Text(
-                        'Unbook',
+                      icon: const Icon(Icons.close, size: 18),                      label: Text(
+                        AppStrings.unbookMenuItem,
                         style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600),
                       ),
@@ -293,17 +294,15 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 8), // More button (work in progress)
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        SnackBarUtils.showCustom(
+                      onPressed: () {                        SnackBarUtils.showCustom(
                           context,
-                          'Work in progress',
+                          AppStrings.workInProgress,
                           backgroundColor: Colors.blueGrey[700],
                           icon: Icons.construction,
                         );
                       },
-                      icon: const Icon(Icons.navigation, size: 18),
-                      label: const Text(
-                        'Navigate',
+                      icon: const Icon(Icons.navigation, size: 18),                      label: Text(
+                        AppStrings.navigateMenuItem,
                         style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600),
                       ),
@@ -335,12 +334,11 @@ class _HomePageState extends State<HomePage> {
         builder: (context) => QrScannerPage(
           expectedSpotId: spotId,
           address: address,
-          onSuccess: () {
-            SnackBarUtils.showSuccess(
-                context, 'QR Code verified successfully!');
+          onSuccess: () {            SnackBarUtils.showSuccess(
+                context, AppStrings.qrCodeVerifiedSuccessfully);
           },
           onSkip: () {
-            SnackBarUtils.showWarning(context, 'QR scanning skipped');
+            SnackBarUtils.showWarning(context, AppStrings.qrScanningSkipped);
           },
         ),
       ),
@@ -362,58 +360,60 @@ class _HomePageState extends State<HomePage> {
       await _unbookSpot(context, spotId, bookingId);
     }
   }
-
   Future<void> _unbookSpot(
     BuildContext context,
     String spotId,
     String bookingId,
   ) async {
-    try {
-      // Update the parking spot to be available
-      await FirebaseFirestore.instance
-          .collection('parking_spots')
-          .doc(spotId)
-          .update({'isAvailable': true});
+    final result = await ErrorService.executeWithErrorHandling<bool>(
+      context,
+      () async {
+        // Update the parking spot to be available
+        await FirebaseFirestore.instance
+            .collection('parking_spots')
+            .doc(spotId)            .update({'isAvailable': true});
 
-      // Update the booking status to completed
-      await FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(bookingId)
-          .update({
-        'status': 'completed',
-        'endTime': Timestamp.now(),
-      });
+        // Update the booking status to completed
+        await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .update({
+          'status': AppStrings.completedStatus,
+          'endTime': Timestamp.now(),
+        });
 
-      if (context.mounted) {
-        SnackBarUtils.showSuccess(
-            context, 'Parking spot successfully unbooked!');
+        return true;
+      },
+      operationName: AppStrings.unbookParkingSpotOperation,
+      showSnackBar: true,
+    );
+
+    if (result != null && result == true) {
+      if (context.mounted) {        SnackBarUtils.showSuccess(
+            context, AppStrings.parkingSpotSuccessfullyUnbooked);
       }
-    } catch (e) {
-      // Handle the case where spot might not exist
-      if (e.toString().contains('not-found')) {
-        try {
-          // Just mark booking as completed since spot doesn't exist
+    } else {
+      // Handle the case where spot might not exist - try alternative approach
+      final fallbackResult = await ErrorService.executeWithErrorHandling<bool>(
+        context,
+        () async {
+          // Just mark booking as completed since spot might not exist
           await FirebaseFirestore.instance
               .collection('bookings')
               .doc(bookingId)
-              .update({
-            'status': 'spot_deleted',
+              .update({            'status': AppStrings.spotDeletedStatus,
             'endTime': Timestamp.now(),
-            'note': 'Parking spot no longer available',
+            'note': AppStrings.parkingSpotNoLongerAvailable,
           });
-          if (context.mounted) {
-            SnackBarUtils.showWarning(
-                context, 'Booking ended (spot no longer available)');
-          }
-        } catch (updateError) {
-          if (context.mounted) {
-            SnackBarUtils.showError(
-                context, 'Error ending booking: ${updateError.toString()}');
-          }
-        }
-      } else {
-        if (context.mounted) {
-          SnackBarUtils.showError(context, 'Failed to unbook: ${e.toString()}');
+          return true;
+        },
+        operationName: AppStrings.endBookingSpotUnavailableOperation,
+        showSnackBar: false, // Don't show error for this fallback
+      );
+
+      if (fallbackResult != null && fallbackResult == true) {
+        if (context.mounted) {          SnackBarUtils.showWarning(
+              context, AppStrings.bookingEndedSpotUnavailable);
         }
       }
     }
@@ -423,17 +423,16 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Parking Manager')),
-        body: const Center(
-          child: Text('Please log in to access the app.'),
+      return Scaffold(        appBar: AppBar(title: Text(AppStrings.appTitle)),
+        body: Center(
+          child: Text(AppStrings.pleaseLogInToAccess),
         ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Parking Manager'),
+        title: Text(AppStrings.appTitle),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -441,7 +440,7 @@ class _HomePageState extends State<HomePage> {
           // Profile Button
           IconButton(
             icon: const Icon(Icons.account_circle, color: Colors.white),
-            tooltip: 'Profile',
+            tooltip: AppStrings.profileTooltip,
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const ProfilePage()),
@@ -451,7 +450,7 @@ class _HomePageState extends State<HomePage> {
           // Logout Button
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
+            tooltip: AppStrings.logoutTooltip,
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
@@ -484,16 +483,15 @@ class _HomePageState extends State<HomePage> {
                       size: 35,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Parking Manager',
+                  const SizedBox(height: 10),                  Text(
+                    AppStrings.parkingManagerTitle,
                     style: TextStyle(color: Colors.white, fontSize: 20),
                   ),
                   const SizedBox(height: 5),
                   FutureBuilder<String>(
                     future: _getUserName(user),
                     builder: (context, snapshot) {
-                      String name = snapshot.data ?? 'User';
+                      String name = snapshot.data ?? AppStrings.defaultUserName;
                       return Text(
                         name,
                         style: const TextStyle(
@@ -508,7 +506,7 @@ class _HomePageState extends State<HomePage> {
             ),
             ListTile(
               leading: const Icon(Icons.search_outlined),
-              title: const Text('Book a Spot'),
+              title: Text(AppStrings.bookASpot),
               onTap: () {
                 Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
@@ -518,7 +516,7 @@ class _HomePageState extends State<HomePage> {
             ),
             ListTile(
               leading: const Icon(Icons.add_location_alt_outlined),
-              title: const Text('List a New Spot'),
+              title: Text(AppStrings.listANewSpot),
               onTap: () {
                 Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
@@ -529,7 +527,7 @@ class _HomePageState extends State<HomePage> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.history_edu_outlined),
-              title: const Text('My Listed Spots'),
+              title: Text(AppStrings.myListedSpots),
               onTap: () {
                 Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
@@ -541,7 +539,7 @@ class _HomePageState extends State<HomePage> {
             ),
             ListTile(
               leading: const Icon(Icons.receipt_long_outlined),
-              title: const Text('My Booking History'),
+              title: Text(AppStrings.myBookingHistory),
               onTap: () {
                 Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
@@ -554,7 +552,7 @@ class _HomePageState extends State<HomePage> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.account_circle),
-              title: const Text('Profile'),
+              title: Text(AppStrings.profile),
               onTap: () {
                 Navigator.pop(context); // Close drawer
                 Navigator.of(context).push(
@@ -564,7 +562,7 @@ class _HomePageState extends State<HomePage> {
             ),
             ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
+              title: Text(AppStrings.logout),
               onTap: () async {
                 Navigator.pop(context); // Close drawer
                 await FirebaseAuth.instance.signOut();
@@ -591,10 +589,9 @@ class _HomePageState extends State<HomePage> {
               children: [
                 FutureBuilder<String>(
                   future: _getUserName(user),
-                  builder: (context, snapshot) {
-                    String name = snapshot.data ?? 'User';
+                  builder: (context, snapshot) {                    String name = snapshot.data ?? AppStrings.defaultUserName;
                     return Text(
-                      'Welcome, $name!',
+                      '${AppStrings.welcomeUser}$name!',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -603,9 +600,8 @@ class _HomePageState extends State<HomePage> {
                     );
                   },
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Manage your parking spots and bookings',
+                const SizedBox(height: 8),                Text(
+                  AppStrings.manageParkingMessage,
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.teal.shade600,
@@ -616,7 +612,7 @@ class _HomePageState extends State<HomePage> {
                   stream: FirebaseFirestore.instance
                       .collection('bookings')
                       .where('userId', isEqualTo: user.uid)
-                      .where('status', isEqualTo: 'active')
+                      .where('status', isEqualTo: AppStrings.activeStatus)
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
@@ -638,7 +634,7 @@ class _HomePageState extends State<HomePage> {
                             .doc(spotId)
                             .get(),
                         builder: (context, spotSnapshot) {
-                          String remainingText = 'Loading...';
+                          String remainingText = AppStrings.loading;
 
                           if (spotSnapshot.hasData &&
                               spotSnapshot.data!.exists) {
@@ -651,22 +647,19 @@ class _HomePageState extends State<HomePage> {
                               final availableUntil =
                                   availableUntilTimestamp.toDate();
                               final now = DateTime.now();
-                              final remaining = availableUntil.difference(now);
-
-                              remainingText = remaining.isNegative
-                                  ? 'Expired'
-                                  : '${remaining.inHours}h ${remaining.inMinutes % 60}m remaining';
+                              final remaining = availableUntil.difference(now);                              remainingText = remaining.isNegative
+                                  ? AppStrings.expired
+                                  : '${remaining.inHours}${AppStrings.hoursMinutesRemaining}${remaining.inMinutes % 60}${AppStrings.minutesRemaining}';
                             } else {
-                              remainingText = 'No time limit';
+                              remainingText = AppStrings.noTimeLimit;
                             }
                           } else {
-                            remainingText = 'Spot unavailable';
+                            remainingText = AppStrings.spotUnavailable;
                           }
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Current Booking',
+                            children: [                              Text(
+                                AppStrings.currentBooking,
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -699,9 +692,8 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quick Actions',
+                children: [                  Text(
+                    AppStrings.quickActions,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -712,7 +704,7 @@ class _HomePageState extends State<HomePage> {
                   _buildHomeButton(
                     context,
                     icon: Icons.search_outlined,
-                    label: 'Book a Parking Spot',
+                    label: AppStrings.bookAParkingSpot,
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -724,7 +716,7 @@ class _HomePageState extends State<HomePage> {
                   _buildHomeButton(
                     context,
                     icon: Icons.add_location_alt_outlined,
-                    label: 'List a New Spot',
+                    label: AppStrings.listANewSpot,
                     backgroundColor: Colors.orange.shade400,
                     onPressed: () {
                       Navigator.of(context).push(
@@ -737,7 +729,7 @@ class _HomePageState extends State<HomePage> {
                   _buildHomeButton(
                     context,
                     icon: Icons.receipt_long_outlined,
-                    label: 'My Booking History',
+                    label: AppStrings.myBookingHistory,
                     backgroundColor: Colors.purple.shade400,
                     onPressed: () {
                       Navigator.of(context).push(
@@ -751,7 +743,7 @@ class _HomePageState extends State<HomePage> {
                   _buildHomeButton(
                     context,
                     icon: Icons.history_edu_outlined,
-                    label: 'My Listed Spots',
+                    label: AppStrings.myListedSpots,
                     backgroundColor: Colors.blue.shade400,
                     onPressed: () {
                       Navigator.of(context).push(
@@ -769,23 +761,30 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
   // Helper method to get user name for display
   Future<String> _getUserName(User user) async {
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (userDoc.exists && userDoc.data() != null) {
-        final data = userDoc.data()!;
-        final name = data['name'] as String? ?? '';
-        if (name.isNotEmpty) {
-          return name;
+    final result = await ErrorService.executeWithErrorHandling<String>(
+      context,
+      () async {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final data = userDoc.data()!;
+          final name = data['name'] as String? ?? '';
+          if (name.isNotEmpty) {
+            return name;
+          }
         }
-      }
-    } catch (e) {
-      print('Error getting user name: $e');
+        throw Exception('User name not found');
+      },
+      operationName: AppStrings.getUserNameOperation,
+      showSnackBar: false, // Silent operation for background user name fetching
+    );
+
+    if (result != null) {
+      return result;
     }
 
     // Fallback to display name or email
@@ -798,6 +797,6 @@ class _HomePageState extends State<HomePage> {
       return user.email!.split('@')[0];
     }
 
-    return 'User';
+    return AppStrings.defaultUserName;
   }
 }

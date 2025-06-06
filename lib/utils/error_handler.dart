@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
+import 'app_constants.dart';
 
 /// Custom exception classes for better error categorization
 class AppException implements Exception {
@@ -62,66 +63,62 @@ class ErrorHandler {
     // In production, you might want to send errors to a crash reporting service
     // like Firebase Crashlytics, Sentry, etc.
   }
-
   /// Convert Firebase Auth errors to user-friendly messages
   static String getAuthErrorMessage(FirebaseAuthException error) {
     switch (error.code) {
       case 'user-not-found':
-        return 'No user found with this email address.';
+        return AuthErrorMessages.userNotFound;
       case 'wrong-password':
-        return 'Incorrect password. Please try again.';
+        return AuthErrorMessages.wrongPassword;
       case 'email-already-in-use':
-        return 'An account already exists with this email address.';
+        return AuthErrorMessages.emailAlreadyInUse;
       case 'weak-password':
-        return 'Password is too weak. Please choose a stronger password.';
+        return AuthErrorMessages.weakPassword;
       case 'invalid-email':
-        return 'Please enter a valid email address.';
+        return AuthErrorMessages.invalidEmail;
       case 'user-disabled':
-        return 'This account has been disabled. Please contact support.';
+        return AuthErrorMessages.userDisabled;
       case 'too-many-requests':
-        return 'Too many failed attempts. Please try again later.';
+        return AuthErrorMessages.tooManyRequests;
       case 'operation-not-allowed':
-        return 'This sign-in method is not enabled. Please contact support.';
-      case 'invalid-credential':
-        return 'Invalid credentials. Please check your email and password.';
+        return AuthErrorMessages.operationNotAllowed;      case 'invalid-credential':
+        return AuthErrorMessages.invalidCredential;
       case 'network-request-failed':
-        return 'Network error. Please check your internet connection.';
+        return AuthErrorMessages.networkRequestFailed;
       case 'requires-recent-login':
-        return 'Please sign in again to continue.';
+        return AuthErrorMessages.requiresRecentLogin;
       default:
-        return 'Authentication failed: ${error.message ?? 'Unknown error'}';
+        return '${AuthErrorMessages.defaultAuthError}: ${error.message ?? 'Unknown error'}';
     }
   }
-
   /// Convert Firestore errors to user-friendly messages
   static String getFirestoreErrorMessage(FirebaseException error) {
     switch (error.code) {
       case 'permission-denied':
-        return 'You don\'t have permission to perform this action.';
+        return DatabaseErrorMessages.permissionDenied;
       case 'unavailable':
-        return 'Service is currently unavailable. Please try again later.';
+        return DatabaseErrorMessages.unavailable;
       case 'not-found':
-        return 'The requested data was not found.';
+        return DatabaseErrorMessages.notFound;
       case 'already-exists':
-        return 'This data already exists.';
+        return DatabaseErrorMessages.alreadyExists;
       case 'resource-exhausted':
-        return 'Service quota exceeded. Please try again later.';
+        return DatabaseErrorMessages.resourceExhausted;
       case 'failed-precondition':
-        return 'Operation failed due to invalid state.';
+        return DatabaseErrorMessages.failedPrecondition;
       case 'aborted':
-        return 'Operation was aborted. Please try again.';
+        return DatabaseErrorMessages.aborted;
       case 'out-of-range':
-        return 'Invalid data range provided.';
+        return DatabaseErrorMessages.outOfRange;
       case 'unimplemented':
-        return 'This feature is not yet implemented.';
+        return DatabaseErrorMessages.unimplemented;
       case 'internal':
-        return 'Internal server error. Please try again later.';
+        return DatabaseErrorMessages.internal;
       case 'deadline-exceeded':
-        return 'Request timed out. Please try again.';
+        return DatabaseErrorMessages.deadlineExceeded;
       case 'unauthenticated':
-        return 'You must be signed in to perform this action.';
-      default:
-        return 'Database error: ${error.message ?? 'Unknown error'}';
+        return DatabaseErrorMessages.unauthenticated;      default:
+        return '${DatabaseErrorMessages.defaultDatabaseError}: ${error.message ?? 'Unknown error'}';
     }
   }
 

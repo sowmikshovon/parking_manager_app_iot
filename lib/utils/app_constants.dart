@@ -101,31 +101,404 @@ class AppStrings {
   static const String refresh = 'Refresh';
   static const String continueBooking = 'Continue Booking';
   static const String generateQrCode = 'Generate QR Code';
+  static const String downloadQrAsPdf = 'Download QR as PDF';
   static const String scanQrCode = 'Scan QR Code';
+  static const String retry = 'Retry';
+  static const String ok = 'OK';
+  static const String confirm = 'Confirm';
 
   // Messages
   static const String qrCodeVerified = 'QR Code Verified!';
+  static const String wrongQrCode = 'Wrong QR Code';
+  static const String qrCodeMismatch =
+      'The QR code you scanned does not match this parking spot at:';
+  static const String scanCorrectQrCode =
+      'Please scan the correct QR code for this location.';
+  static const String tryAgain = 'Try Again';
+  static const String scanQrCodeFor = 'Scan QR Code for:';
+  static const String pointCameraAtQrCode = 'Point your camera at the QR code';
+
   static const String parkingSpotVerified = 'Parking spot verified at:';
   static const String scanQrCodeToVerify =
       'Scan this QR code to verify parking spot';
   static const String parkingSpotQrCode = 'Parking Spot QR Code';
 
+  // Default user names
+  static const String defaultUserName = 'User';
+  static const String home = 'Home';
+  // Time-related
+  static const String bookedAt = 'Booked at';
+  static const String availableUntil = 'Available Until:';
+  static const String selectDateTime = 'Select Date & Time';
+  static const String ends = 'Ends:'; // Status messages
+  static const String checking = 'Checking...';
+  static const String booked = 'Booked';
+  static const String expired = 'Expired';
+  static const String available = 'Available';
+  static const String unavailable = 'Unavailable';
+  static const String active = 'active';
+  static const String activeStatus = 'active';
+  static const String completedStatus = 'completed';
+  static const String spotDeletedStatus = 'spot_deleted';
+
   // Validation messages
+  static const String selectDateTimeMessage =
+      'Please select the date and time the spot will be available until.';
+  static const String availabilityMinimumMessage =
+      'Availability must be at least 5 minutes in the future.';
+  static const String emailRequired = 'Email is required';
+  static const String firstNameMinLength =
+      'First name must be at least 2 characters';
+  static const String lastNameMinLength =
+      'Last name must be at least 2 characters';
+  static const String validEmailRequired = 'Please enter a valid email address';
   static const String requiredField = 'This field is required';
-  static const String firstNameRequired = 'First name is required';
-  static const String lastNameRequired = 'Last name is required';
-  static const String invalidEmail = 'Please enter a valid email';
   static const String invalidPassword =
       'Password must be at least 6 characters';
-  static const String passwordMismatch = 'Passwords do not match';
 
+  // Common messages
+  static const String unknown = 'Unknown';
+  static const String ongoing = 'Ongoing';
+  static const String noAddress = 'No address';
+  static const String noBookingHistory = 'No booking history found.';
+  static const String noListedSpots = 'No listed spots.';
+  static const String bookingSuccessful = 'Parking spot booked successfully!';
+  static const String bookingFailed =
+      'Failed to book parking spot. Please try again.';
+  static const String parkingSpotListed = 'Parking spot listed successfully!';
+  static const String workInProgress = 'Work in progress';
+  static const String qrCodeVerifiedSuccessfully =
+      'QR Code verified successfully!';
+  static const String qrScanningSkipped = 'QR scanning skipped';
+  static const String signUpSuccessful = 'Sign up successful! Please log in.';
+  static const String signUpFailed =
+      'Sign up failed. Please check your information and try again.';
+  static const String loginFailed =
+      'Login failed. Please check your credentials and try again.';
+  static const String signInOperation = 'Sign in';
+  static const String pleaseEnterEmail = 'Please enter your email address.';
+  static const String pleaseEnterPassword = 'Please enter your password.';
+  static const String dontHaveAccount = "Don't have an account? Sign up";
+
+  // Page titles
+  static const String welcomeBack = 'Welcome Back!';
+  static const String createAccount = 'Create Account';
+  static const String confirmSpotDetails = 'Confirm Spot Details';
+  static const String myBookingHistory = 'My Booking History';
+  static const String myListedSpots = 'My Listed Spots';
+  static const String bookASpot = 'Book a Spot';
+  static const String bookAParkingSpot = 'Book a Parking Spot';
+  static const String listANewSpot = 'List a New Spot';
+  static const String editAvailability = 'Edit Availability';
+
+  // Navigation menu items
+  static const String scanQrCodeMenuItem = 'Scan';
+  static const String unbookMenuItem = 'Unbook';
+  static const String mapMenuItem = 'Map';
+  static const String navigateMenuItem = 'Navigate';
+
+  // Authentication prompts
+  static const String pleaseLogInBookingHistory =
+      'Please log in to see your booking history.';
+  static const String pleaseLogInListedSpots =
+      'Please log in to see your listed spots.';
+  static const String pleaseLogInToAccess = 'Please log in to access the app.';
+
+  // Form labels
+  static const String location = 'Location:';
+  static const String addressOrDescription = 'Address or Description';
+  static const String addressHint = 'e.g., Near the park entrance';
+  static const String pleaseEnterAddress =
+      'Please enter an address or description.';
+  static const String confirmAndListSpot = 'CONFIRM AND LIST SPOT';
+  static const String listing = 'LISTING...';
+  static const String confirmBooking = 'Confirm Booking';
+  static const String booking = 'BOOKING...';
+
+  // Error messages for UI
+  static const String errorLoading = 'Error: ';
+  static const String noSpotsFound = 'No parking spots found at the moment.';
+  static const String spotNoLongerAvailableMessage =
+      'This parking spot is no longer available.';
+
+  // Welcome messages
+  static const String welcomeUser = 'Welcome, ';
+  static const String manageParkingMessage =
+      'Manage your parking spots and bookings';
+  static const String currentBooking = 'Current Booking';
+  static const String quickActions = 'Quick Actions';
+
+  // Tooltips
+  static const String profileTooltip = 'Profile';
+  static const String logoutTooltip = 'Logout';
+  static const String myLocationTooltip = 'My Location';
+
+  // Operation names
+  static const String checkExpiredSpotsOperation = 'Check expired spots';
+  static const String unbookParkingSpotOperation = 'Unbook parking spot';
+  static const String endBookingSpotUnavailableOperation =
+      'End booking (spot unavailable)';
+  static const String getUserNameOperation = 'Get user name';
+  // Time and status messages
+  static const String bookedAtPrefix = 'Booked at ';
+  static const String noTimeLimit = 'No time limit';
+  static const String spotUnavailable = 'Spot unavailable';
+  static const String loading = 'Loading...';
+  static const String hoursMinutesRemaining =
+      'h '; // for "Xh Ym remaining" format
+  static const String minutesRemaining = 'm remaining';
+
+  // Booking status messages
+  static const String parkingSpotSuccessfullyUnbooked =
+      'Parking spot successfully unbooked!';
+  static const String bookingEndedSpotUnavailable =
+      'Booking ended (spot no longer available)';
+  static const String parkingSpotNoLongerAvailable =
+      'Parking spot no longer available';
+  static const String mustBeLoggedInToBook =
+      'You must be logged in to book a parking spot.';
+  // Drawer and navigation labels
+  static const String parkingManagerTitle = 'Parking Manager';
+  // Authentication and booking messages
+  static const String parkingSpotNoLongerAvailable2 =
+      'This parking spot is no longer available.';
+  static const String parkingSpotAlreadyBooked =
+      'This parking spot has already been booked.';
+  static const String parkingSpotExpired = 'This parking spot has expired.';
+  static const String failedToBookSpot =
+      'Failed to book parking spot. Please try again.';
+  static const String bookParkingSpotOperation = 'Book parking spot';
+  static const String getUserLocationOperation = 'Get user location';
+  static const String mapNotReady = 'Map is not ready yet. Please try again.';
+  static const String parkingEndedSuccessfully = 'Parking ended successfully!';
+  static const String endParkingOperation = 'End parking';
+
+  // Status and time messages
+  static const String startedPrefix = 'Started: ';
+  static const String endedPrefix = 'Ended: ';
+  static const String noBookingHistoryFound = 'No booking history found.';
+  static const String scanLabel = 'Scan';
+  static const String mapLabel = 'Map';
+  // Listing page messages
+  static const String spotIdPrefix = 'Spot ID: ';
+  static const String statusPrefix = 'Status: ';
+  static const String availableUntilPrefix = 'Available until: ';
+  static const String timeFinished = 'Time Finished';
+  static const String reEnable = 'Re-enable';
+  static const String editAvailabilityLabel = 'Edit';
+  static const String deleteLabel = 'Delete';
+  static const String showQrLabel = 'Show QR';
+
+  // Listing operations
+  static const String updateParkingSpotOperation = 'Update parking spot';
+  static const String deleteParkingSpotOperation = 'Delete parking spot';
+  static const String enableParkingSpotOperation = 'Enable parking spot';
+
+  // Success/Error messages for listing
+  static const String spotReenabledSuccessfully =
+      'Spot re-enabled successfully!';
+  static const String availabilityUpdatedSuccessfully =
+      'Availability updated successfully!';
+  static const String spotDeletedSuccessfully = 'Spot deleted successfully!';
+  static const String errorUpdatingSpot = 'Error updating spot: ';
+  static const String errorDeletingSpot = 'Error deleting spot: ';
+  // Dialog messages
+  static const String editAvailabilityTitle = 'Edit Availability';
+  static const String selectAvailabilityUntil =
+      'Select when this spot will be available until:';
+  static const String update = 'Update';
+  static const String deleteSpotTitle = 'Delete Spot';
+  static const String deleteSpotConfirmation =
+      'Are you sure you want to delete this parking spot? This action cannot be undone.';
+  static const String selectFutureDateTime =
+      'Please select a future date and time.';
+
+  // Profile page constants
+  static const String saveProfile = 'Save Profile';
+  static const String selectImageSource = 'Select Image Source';
+  static const String camera = 'Camera';
+  static const String gallery = 'Gallery';
+
+  // Profile validation messages
+  static const String firstNameRequired = 'First name is required';
+  static const String lastNameRequired = 'Last name is required';
+
+  // Profile success messages
+  static const String profileUpdatedSuccessfully =
+      'Profile updated successfully!';
+
+  // Profile error messages
+  static const String failedToSaveProfile =
+      'Failed to save profile. Please try again.';
+  static const String userNotLoggedInCannotUploadImage =
+      'User not logged in. Cannot upload image.';
+  static const String imageFileDoesNotExist =
+      'Image file does not exist at path: ';
+  static const String imageFileEmpty = 'Image file is empty.';
+  static const String imageUploadFailed = 'Image upload failed';
+  static const String imageUploadFailedState = 'Image upload failed. State: ';
+  static const String noUserLoggedIn = 'No user logged in';
+  static const String imageTooLarge =
+      'Image file is too large. Please select an image smaller than 5MB.';
+  static const String failedToPickImage = 'Failed to pick image.';
+  static const String failedToUpdateProfile = 'Failed to update profile.';
   // Gender options
-  static const List<String> genderOptions = [
-    'Male',
-    'Female',
-    'Other',
-    'Prefer not to say'
-  ];
+  static const String male = 'Male';
+  static const String female = 'Female';
+  static const String other = 'Other';
+  static const String preferNotToSay = 'Prefer not to say';
+  static const String nextButtonLabel = 'Next';
+
+  //Return to Home button
+  static const String returnToHome = 'Return to Home';
+}
+
+/// Error handling string constants
+class ErrorStrings {
+  // Dialog titles
+  static const String authenticationError = 'Authentication Error';
+  static const String databaseError = 'Database Error';
+  static const String locationError = 'Location Error';
+  static const String networkError = 'Network Error';
+  static const String error = 'Error';
+
+  // Default operations
+  static const String authenticationOperation = 'Authentication';
+  static const String databaseOperation = 'Database operation';
+  static const String locationAccessOperation = 'Location access';
+  static const String networkRequestOperation = 'Network request';
+  static const String operation = 'Operation';
+  static const String bookingOperation = 'Booking operation';
+  static const String spotListingOperation = 'Spot listing';
+  static const String getUserNameOperation = 'Get user name';
+
+  // Booking error messages
+  static const String spotNoLongerAvailable =
+      'The parking spot is no longer available.';
+  static const String noPermissionAction =
+      'You don\'t have permission to perform this action.';
+  static const String serviceUnavailable =
+      'Service is currently unavailable. Please try again later.';
+
+  // Spot listing error messages
+  static const String mustBeLoggedIn = 'You must be logged in to list a spot.';
+  static const String noPermissionListSpots =
+      'You don\'t have permission to list spots.';
+
+  // Location error messages
+  static const String locationPermissionRequired =
+      'Location permission required. Please enable location access in Settings.';
+  static const String locationServicesDisabled =
+      'Location services are disabled. Please enable them in Settings.';
+  static const String locationRequestTimeout =
+      'Location request timed out. Please try again.';
+  static const String couldNotGetLocation =
+      'Could not get your location. Please try again.';
+
+  // Error detection strings (used in contains() checks)
+  static const String documentNotExist = 'document does not exist';
+  static const String notFound = 'not found';
+  static const String permissionDenied = 'permission-denied';
+  static const String unavailable = 'unavailable';
+  static const String unauthenticated = 'unauthenticated';
+  static const String noLocationPermissions = 'No location permissions';
+  static const String permissions = 'permissions';
+  static const String locationServices = 'Location services';
+  static const String disabled = 'disabled';
+  static const String timeout = 'timeout';
+  static const String timeoutException = 'TimeoutException';
+  static const String location = 'location';
+  static const String locationCapitalized = 'Location';
+  static const String permission = 'permission';
+  static const String network = 'network';
+  static const String connection = 'connection';
+  // Validation error messages
+  static const String addressRequired = 'Address is required';
+  static const String futureDateTimeRequired =
+      'Selected date and time must be in the future';
+  // Exception messages
+  static const String userNameNotFound = 'User name not found';
+  static const String userNotAuthenticated = 'User not authenticated';
+  // Default operation name for retry operations
+  static const String defaultRetryOperation = 'Operation'; // Operation names
+  static const String spotListingOperationName = 'Spot listing';
+  static const String getUserNameOperationName = 'Get user name';
+  static const String deleteParkingSpotOperation = 'Delete parking spot';
+  static const String updateParkingSpotOperation = 'Update parking spot';
+
+  // Profile operation names
+  static const String loadUserProfileOperation = 'Load user profile';
+  static const String pickImageOperation = 'Pick image';
+  static const String uploadProfileImageOperation = 'Upload profile image';
+  static const String saveProfileOperation = 'Save profile';
+
+  static const String createAccountOperation = 'Create account';
+  static const String signupSuccessMessage =
+      'Sign up successful! Please log in.';
+  static const String signupFailedMessage =
+      'Sign up failed. Please check your information and try again.';
+}
+
+/// Authentication error messages
+class AuthErrorMessages {
+  static const String userNotFound = 'No user found with this email address.';
+  static const String wrongPassword = 'Incorrect password. Please try again.';
+  static const String emailAlreadyInUse =
+      'An account already exists with this email address.';
+  static const String weakPassword =
+      'Password is too weak. Please choose a stronger password.';
+  static const String invalidEmail = 'Please enter a valid email address.';
+  static const String userDisabled =
+      'This account has been disabled. Please contact support.';
+  static const String tooManyRequests =
+      'Too many failed attempts. Please try again later.';
+  static const String operationNotAllowed =
+      'This sign-in method is not enabled. Please contact support.';
+  static const String invalidCredential =
+      'Invalid credentials. Please check your email and password.';
+  static const String networkRequestFailed =
+      'Network error. Please check your internet connection.';
+  static const String requiresRecentLogin = 'Please sign in again to continue.';
+  static const String defaultAuthError =
+      'Authentication failed. Please try again.';
+}
+
+/// Database error messages
+class DatabaseErrorMessages {
+  static const String permissionDenied =
+      'You don\'t have permission to perform this action.';
+  static const String unavailable =
+      'Service is currently unavailable. Please try again later.';
+  static const String notFound = 'The requested data was not found.';
+  static const String alreadyExists = 'This data already exists.';
+  static const String resourceExhausted =
+      'Service quota exceeded. Please try again later.';
+  static const String failedPrecondition =
+      'Operation failed due to invalid state.';
+  static const String aborted = 'Operation was aborted. Please try again.';
+  static const String outOfRange = 'Invalid data range provided.';
+  static const String unimplemented = 'This feature is not yet implemented.';
+  static const String internal =
+      'Internal server error. Please try again later.';
+  static const String deadlineExceeded = 'Request timed out. Please try again.';
+  static const String unauthenticated =
+      'You must be signed in to perform this action.';
+  static const String defaultDatabaseError =
+      'Database error occurred. Please try again.';
+}
+
+/// General error messages
+class GeneralErrorMessages {
+  static const String noInternetConnection =
+      'No internet connection. Please check your network settings.';
+  static const String serverError = 'Server error. Please try again later.';
+  static const String notFound = 'The requested item was not found.';
+  static const String unauthorized =
+      'You are not authorized to perform this action.';
+  static const String validationFailed =
+      'Please check your input and try again.';
+  static const String unknownError =
+      'An unexpected error occurred. Please try again.';
 }
 
 /// Application dimension constants
@@ -261,4 +634,5 @@ class AppConfig {
   // Limits
   static const int maxImageSizeMB = 5;
   static const int maxFileNameLength = 100;
+  static const String signInOperation = 'Sign in';
 }

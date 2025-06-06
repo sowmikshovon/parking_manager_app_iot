@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/date_time_utils.dart';
+import '../utils/app_constants.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -20,12 +21,12 @@ class _ProfilePageState extends State<ProfilePage> {
   final _lastNameController = TextEditingController();
   final _dateController = TextEditingController();
 
-  String _selectedGender = 'Prefer not to say';
+  String _selectedGender = AppStrings.preferNotToSay;
   final List<String> _genderOptions = [
-    'Male',
-    'Female',
-    'Other',
-    'Prefer not to say',
+    AppStrings.male,
+    AppStrings.female,
+    AppStrings.other,
+    AppStrings.preferNotToSay,
   ];
 
   DateTime? _selectedDate;
@@ -135,18 +136,18 @@ class _ProfilePageState extends State<ProfilePage> {
       final source = await showDialog<ImageSource>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Select Image Source'),
+          title: const Text(AppStrings.selectImageSource),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
+                title: const Text(AppStrings.camera),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
+                title: const Text(AppStrings.gallery),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
             ],
@@ -170,8 +171,7 @@ class _ProfilePageState extends State<ProfilePage> {
           if (fileSize > 5 * 1024 * 1024) {
             if (mounted) {
               setState(() {
-                _error =
-                    'Image file is too large. Please select an image smaller than 5MB.';
+                _error = AppStrings.imageTooLarge;
               });
             }
             return;
@@ -185,7 +185,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     } catch (e) {
       setState(() {
-        _error = 'Failed to pick image: $e';
+        _error = AppStrings.failedToPickImage + ': $e';
       });
     }
   }
@@ -220,7 +220,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         setState(() {
-          _error = 'User not logged in. Cannot upload image.';
+          _error = AppStrings.userNotLoggedInCannotUploadImage;
         });
         return null;
       }
@@ -235,13 +235,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (!await _imageFile!.exists()) {
         setState(() {
-          _error = 'Image file does not exist at path: ${_imageFile!.path}';
+          _error = AppStrings.imageFileDoesNotExist + ': ${_imageFile!.path}';
         });
         return null;
       }
       if (await _imageFile!.length() == 0) {
         setState(() {
-          _error = 'Image file is empty.';
+          _error = AppStrings.imageFileEmpty;
         });
         return null;
       }
@@ -262,21 +262,18 @@ class _ProfilePageState extends State<ProfilePage> {
         print(
             'Image upload failed. State: ${snapshot.state}, Bytes Transferred: ${snapshot.bytesTransferred}/${snapshot.totalBytes}');
         setState(() {
-          _error = 'Image upload failed. State: ${snapshot.state}';
+          _error = AppStrings.imageUploadFailedState + ': ${snapshot.state}';
         });
         return null;
       }
     } on FirebaseException catch (e) {
       print(
           'Firebase Storage Exception during image upload. Code: ${e.code}. Message: ${e.message}. StackTrace: ${e.stackTrace}');
-      String displayError =
-          'Image upload failed: ${e.message ?? "Unknown Firebase error"}';
+      String displayError = AppStrings.imageUploadFailed + ': ${e.message ?? "Unknown Firebase error"}';
       if (e.code == 'object-not-found') {
-        displayError =
-            'Image upload failed: The file was not found after attempting upload. Check permissions or network.';
+        displayError = AppStrings.imageUploadFailed + ': The file was not found after attempting upload. Check permissions or network.';
       } else if (e.code == 'unauthorized' || e.code == 'permission-denied') {
-        displayError =
-            'Image upload failed: Permission denied. Check Firebase Storage rules.';
+        displayError = AppStrings.imageUploadFailed + ': Permission denied. Check Firebase Storage rules.';
       }
       setState(() {
         _error = displayError;
@@ -286,7 +283,7 @@ class _ProfilePageState extends State<ProfilePage> {
       print(
           'Generic Exception during image upload: $e. StackTrace: $stackTrace');
       setState(() {
-        _error = 'Image upload failed: An unexpected error occurred. $e';
+        _error = AppStrings.imageUploadFailed + ': An unexpected error occurred. $e';
       });
       return null;
     }
@@ -306,7 +303,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         setState(() {
-          _error = 'No user logged in';
+          _error = AppStrings.noUserLoggedIn;
           _isLoading = false; // Ensure loading is stopped
         });
         return;
@@ -327,7 +324,7 @@ class _ProfilePageState extends State<ProfilePage> {
           if (mounted) {
             // Check if the widget is still in the tree
             SnackBarUtils.showError(
-                context, _error ?? 'Image upload failed. Profile not saved.');
+                context, _error ?? AppStrings.imageUploadFailed + '. Profile not saved.');
           }
           return;
         }
@@ -362,21 +359,20 @@ class _ProfilePageState extends State<ProfilePage> {
           .set(userData, SetOptions(merge: true)); // Use set with merge:true
 
       if (mounted) {
-        SnackBarUtils.showSuccess(context, 'Profile updated successfully!');
+        SnackBarUtils.showSuccess(context, AppStrings.profileUpdatedSuccessfully);
       }
     } on FirebaseException catch (e) {
       // Catch Firestore specific errors
       print(
           'Firestore Exception during profile save: ${e.code} - ${e.message}');
       setState(() {
-        _error =
-            'Failed to update profile: ${e.message ?? "Unknown Firebase error"} (Code: ${e.code})';
+        _error = AppStrings.failedToSaveProfile + ': ${e.message ?? "Unknown Firebase error"} (Code: ${e.code})';
       });
     } catch (e) {
       // Catch any other errors
       print('Generic Exception during profile save: $e');
       setState(() {
-        _error = 'Failed to update profile: $e';
+        _error = AppStrings.failedToSaveProfile + ': $e';
       });
     } finally {
       setState(() {
@@ -390,7 +386,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
+      appBar: AppBar(title: const Text(AppStrings.editProfile)),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -467,12 +463,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: TextFormField(
                               controller: _firstNameController,
                               decoration: const InputDecoration(
-                                labelText: 'First Name',
+                                labelText: AppStrings.firstName,
                                 border: OutlineInputBorder(),
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'First name is required';
+                                  return AppStrings.firstNameRequired;
                                 }
                                 return null;
                               },
@@ -483,12 +479,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: TextFormField(
                               controller: _lastNameController,
                               decoration: const InputDecoration(
-                                labelText: 'Last Name',
+                                labelText: AppStrings.lastName,
                                 border: OutlineInputBorder(),
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Last name is required';
+                                  return AppStrings.lastNameRequired;
                                 }
                                 return null;
                               },
@@ -502,12 +498,12 @@ class _ProfilePageState extends State<ProfilePage> {
                           TextFormField(
                             controller: _firstNameController,
                             decoration: const InputDecoration(
-                              labelText: 'First Name',
+                              labelText: AppStrings.firstName,
                               border: OutlineInputBorder(),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'First name is required';
+                                return AppStrings.firstNameRequired;
                               }
                               return null;
                             },
@@ -516,12 +512,12 @@ class _ProfilePageState extends State<ProfilePage> {
                           TextFormField(
                             controller: _lastNameController,
                             decoration: const InputDecoration(
-                              labelText: 'Last Name',
+                              labelText: AppStrings.lastName,
                               border: OutlineInputBorder(),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Last name is required';
+                                return AppStrings.lastNameRequired;
                               }
                               return null;
                             },
@@ -538,7 +534,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: TextFormField(
                           controller: _dateController,
                           decoration: const InputDecoration(
-                            labelText: 'Date of Birth',
+                            labelText: AppStrings.dateOfBirth,
                             border: OutlineInputBorder(),
                             suffixIcon: Icon(Icons.calendar_today),
                           ),
@@ -551,7 +547,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     // Gender selection
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
-                        labelText: 'Gender',
+                        labelText: AppStrings.gender,
                         border: OutlineInputBorder(),
                       ),
                       value: _selectedGender,
@@ -583,7 +579,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: _isLoading
                             ? const CircularProgressIndicator()
                             : const Text(
-                                'Save Profile',
+                                AppStrings.saveProfile,
                                 style: TextStyle(fontSize: 16),
                               ),
                       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parking_manager_app_iot/utils/app_constants.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../utils/qr_pdf_util.dart';
 import 'home_page.dart';
@@ -12,7 +13,7 @@ class QrCodePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Spot QR Code')),
+      appBar: AppBar(title: const Text(AppStrings.parkingSpotQrCode)),
       body: Center(
         child: Card(
           margin: const EdgeInsets.all(24),
@@ -22,7 +23,7 @@ class QrCodePage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Parking Spot QR Code',
+                  AppStrings.parkingSpotQrCode,
                   style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
@@ -42,14 +43,14 @@ class QrCodePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Scan this QR code to verify parking spot',
+                  AppStrings.scanQrCodeToVerify,
                   style: Theme.of(context).textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('Download QR as PDF'),
+                  label: const Text(AppStrings.downloadQrAsPdf),
                   onPressed: () async {
                     await saveQrCodeAsPdf(
                       context: context,
@@ -62,7 +63,7 @@ class QrCodePage extends StatelessWidget {
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.home),
-                  label: const Text('Return to Home'),
+                  label: const Text(AppStrings.returnToHome),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal,
                     foregroundColor: Colors.white,

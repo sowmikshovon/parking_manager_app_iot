@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/date_time_utils.dart';
 import '../utils/snackbar_utils.dart';
+import '../utils/error_handler.dart';
+import '../utils/app_constants.dart';
+import '../services/error_service.dart';
 import 'qr_code_page.dart';
 
 class AddressEntryPage extends StatefulWidget {
@@ -56,65 +59,76 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
       }
     }
   }
-
   Future<void> _submitSpot() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    if (_selectedDateTime == null) {
-      SnackBarUtils.showWarning(context,
-          'Please select the date and time the spot will be available until.');
+    
+    // Validate input using ErrorService
+    try {
+      ErrorService.validateUserInput(
+        address: _addressController.text,
+        selectedDateTime: _selectedDateTime,
+      );
+    } on ValidationException catch (e) {
+      ErrorService.handleValidationError(context, e);
       return;
-    } // Ensure the selected date and time is in the future
+    }    if (_selectedDateTime == null) {
+      SnackBarUtils.showWarning(context, AppStrings.selectDateTimeMessage);
+      return;
+    }
+      // Ensure the selected date and time is in the future
     if (_selectedDateTime!
         .isBefore(DateTime.now().add(const Duration(minutes: 5)))) {
-      SnackBarUtils.showWarning(
-          context, 'Availability must be at least 5 minutes in the future.');
+      SnackBarUtils.showWarning(context, AppStrings.availabilityMinimumMessage);
       return;
     }
 
     setState(() => _isLoading = true);
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    final user = FirebaseAuth.instance.currentUser;    if (user == null) {
       if (mounted) {
-        SnackBarUtils.showError(
-            context, 'You must be logged in to list a spot.');
+        ErrorService.handleAuthError(
+          context, 
+          Exception(ErrorStrings.userNotAuthenticated),
+          operation: ErrorStrings.spotListingOperationName,
+        );
       }
       setState(() => _isLoading = false);
       return;
     }
 
-    try {
-      await FirebaseFirestore.instance.collection('parking_spots').add({
-        'address': _addressController.text,
-        'latitude': widget.selectedLatLng.latitude,
-        'longitude': widget.selectedLatLng.longitude,
-        'isAvailable': true,
-        'availableUntil': Timestamp.fromDate(_selectedDateTime!),
-        'ownerId': user.uid,
-        'created_at': FieldValue.serverTimestamp(),
-        'userEmail': user.email,
-      }).then((docRef) async {
-        if (mounted) {
-          SnackBarUtils.showSuccess(
-              context, 'Parking spot listed successfully!');
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => QrCodePage(
-                spotId: docRef.id,
-                address: _addressController.text,
-              ),
+    // Execute spot listing with error handling
+    final result = await ErrorService.executeWithErrorHandling(
+      context,
+      () async {
+        final docRef = await FirebaseFirestore.instance.collection('parking_spots').add({
+          'address': _addressController.text,
+          'latitude': widget.selectedLatLng.latitude,
+          'longitude': widget.selectedLatLng.longitude,
+          'isAvailable': true,
+          'availableUntil': Timestamp.fromDate(_selectedDateTime!),
+          'ownerId': user.uid,
+          'created_at': FieldValue.serverTimestamp(),
+          'userEmail': user.email,
+        });        return docRef;
+      },
+      operationName: ErrorStrings.spotListingOperationName,
+    );
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      
+      if (result != null) {
+        SnackBarUtils.showSuccess(
+            context, 'Parking spot listed successfully!');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => QrCodePage(
+              spotId: result.id,
+              address: _addressController.text,
             ),
-          );
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        SnackBarUtils.showError(context, 'Error listing spot: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+          ),
+        );
       }
     }
   }
