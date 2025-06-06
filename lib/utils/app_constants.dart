@@ -72,7 +72,7 @@ class AppColors {
 class AppStrings {
   // App info
   static const String appTitle = 'Parking Manager';
-  
+
   // Authentication
   static const String login = 'Login';
   static const String signUp = 'Sign Up';
@@ -84,7 +84,7 @@ class AppStrings {
   static const String lastName = 'Last Name';
   static const String dateOfBirth = 'Date of Birth';
   static const String gender = 'Gender';
-  
+
   // Navigation
   static const String profile = 'Profile';
   static const String editProfile = 'Edit Profile';
@@ -92,7 +92,7 @@ class AppStrings {
   static const String listingHistory = 'My Listed Spots';
   static const String selectLocation = 'Select Location';
   static const String spotQrCode = 'Spot QR Code';
-  
+
   // Actions
   static const String save = 'Save';
   static const String cancel = 'Cancel';
@@ -102,23 +102,30 @@ class AppStrings {
   static const String continueBooking = 'Continue Booking';
   static const String generateQrCode = 'Generate QR Code';
   static const String scanQrCode = 'Scan QR Code';
-  
+
   // Messages
   static const String qrCodeVerified = 'QR Code Verified!';
   static const String parkingSpotVerified = 'Parking spot verified at:';
-  static const String scanQrCodeToVerify = 'Scan this QR code to verify parking spot';
+  static const String scanQrCodeToVerify =
+      'Scan this QR code to verify parking spot';
   static const String parkingSpotQrCode = 'Parking Spot QR Code';
-  
+
   // Validation messages
   static const String requiredField = 'This field is required';
   static const String firstNameRequired = 'First name is required';
   static const String lastNameRequired = 'Last name is required';
   static const String invalidEmail = 'Please enter a valid email';
-  static const String invalidPassword = 'Password must be at least 6 characters';
+  static const String invalidPassword =
+      'Password must be at least 6 characters';
   static const String passwordMismatch = 'Passwords do not match';
-  
+
   // Gender options
-  static const List<String> genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  static const List<String> genderOptions = [
+    'Male',
+    'Female',
+    'Other',
+    'Prefer not to say'
+  ];
 }
 
 /// Application dimension constants
@@ -128,33 +135,35 @@ class AppDimensions {
   static const double paddingMedium = 16.0;
   static const double paddingLarge = 24.0;
   static const double paddingXLarge = 32.0;
-  
+
   // Border radius
   static const double borderRadiusSmall = 8.0;
   static const double borderRadiusMedium = 12.0;
   static const double borderRadiusLarge = 16.0;
-  
+
   // Icon sizes
   static const double iconSmall = 16.0;
   static const double iconMedium = 24.0;
   static const double iconLarge = 32.0;
   static const double iconXLarge = 48.0;
-  
+
   // Button dimensions
-  static const EdgeInsets buttonPadding = EdgeInsets.symmetric(horizontal: 24, vertical: 12);
-  static const EdgeInsets cardMargin = EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0);
+  static const EdgeInsets buttonPadding =
+      EdgeInsets.symmetric(horizontal: 24, vertical: 12);
+  static const EdgeInsets cardMargin =
+      EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0);
   static const EdgeInsets screenPadding = EdgeInsets.all(16.0);
   static const EdgeInsets snackBarMargin = EdgeInsets.all(16.0);
-  
+
   // Elevation
   static const double elevationLow = 3.0;
   static const double elevationMedium = 4.0;
   static const double elevationHigh = 8.0;
-  
+
   // QR Code dimensions
   static const double qrCodeSize = 300.0;
   static const double qrCodeContainerSize = 320.0;
-  
+
   // Responsive breakpoints
   static const double mobileBreakpoint = 500.0;
 }
@@ -174,7 +183,7 @@ class MapConstants {
   static const double defaultZoom = 15.0;
   static const double detailZoom = 18.0;
   static const double markerSize = 40.0;
-  
+
   // Default location (can be updated based on app requirements)
   static const double defaultLatitude = 37.7749;
   static const double defaultLongitude = -122.4194;
@@ -188,25 +197,28 @@ class ThemeConstants {
     fontWeight: FontWeight.bold,
     color: AppColors.white,
   );
-  
+
   static const TextStyle headlineStyle = TextStyle(
     fontWeight: FontWeight.bold,
   );
-  
+
   static const TextStyle titleStyle = TextStyle(
     fontWeight: FontWeight.w500,
   );
-  
+
   static const TextStyle errorTextStyle = TextStyle(
     color: AppColors.error,
     fontSize: 14,
   );
-  
+
   // Border styles
-  static const BorderSide primaryBorder = BorderSide(color: AppColors.primary, width: 2);
-  static final BorderSide lightBorder = BorderSide(color: AppColors.primaryShade200);
+  static const BorderSide primaryBorder =
+      BorderSide(color: AppColors.primary, width: 2);
+  static final BorderSide lightBorder =
+      BorderSide(color: AppColors.primaryShade200);
   static final BorderSide greyBorder = BorderSide(color: AppColors.grey400);
-  static const BorderSide whiteBorder = BorderSide(color: AppColors.white, width: 2);
+  static const BorderSide whiteBorder =
+      BorderSide(color: AppColors.white, width: 2);
 }
 
 /// Animation and transition constants
@@ -227,19 +239,25 @@ class AssetPaths {
 class AppConfig {
   // Firebase project info (from firebase_options.dart)
   static const String projectId = 'parking-manager-app-iot';
-  static const String storageBucket = 'parking-manager-app-iot.firebasestorage.app';
-  
+  static const String storageBucket =
+      'parking-manager-app-iot.firebasestorage.app';
+
   // Collection names
   static const String usersCollection = 'users';
   static const String spotsCollection = 'spots';
   static const String bookingsCollection = 'bookings';
-  
+
   // Storage paths
   static const String profileImagesPath = 'profile_images';
-  
+
   // File extensions
-  static const List<String> allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif'];
-  
+  static const List<String> allowedImageExtensions = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif'
+  ];
+
   // Limits
   static const int maxImageSizeMB = 5;
   static const int maxFileNameLength = 100;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/location_service.dart';
+import '../utils/snackbar_utils.dart';
 import 'address_entry_page.dart';
 
 class ListSpotPage extends StatefulWidget {
@@ -36,12 +37,8 @@ class _ListSpotPageState extends State<ListSpotPage> {
       } else {
         print('Map controller is not initialized');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Map is not ready yet. Please try again.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          SnackBarUtils.showWarning(
+              context, 'Map is not ready yet. Please try again.');
         }
       }
     } catch (e) {
@@ -62,16 +59,15 @@ class _ListSpotPageState extends State<ListSpotPage> {
             e.toString().contains('TimeoutException')) {
           errorMessage = 'Location request timed out. Please try again.';
         }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: () => _moveToUserLocation(),
-            ),
+        SnackBarUtils.showCustom(
+          context,
+          errorMessage,
+          backgroundColor: Colors.red,
+          icon: Icons.error,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () => _moveToUserLocation(),
           ),
         );
       }

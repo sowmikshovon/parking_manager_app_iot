@@ -4,7 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:intl/intl.dart';
+import '../utils/snackbar_utils.dart';
+import '../utils/date_time_utils.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -87,7 +88,7 @@ class _ProfilePageState extends State<ProfilePage> {
             final dob = (data['dateOfBirth'] as Timestamp).toDate();
             setState(() {
               _selectedDate = dob;
-              _dateController.text = DateFormat('yyyy-MM-dd').format(dob);
+              _dateController.text = DateTimeUtils.formatDate(dob);
             });
           }
 
@@ -200,7 +201,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        _dateController.text = DateFormat('yyyy-MM-dd').format(picked);
+        _dateController.text = DateTimeUtils.formatDate(picked);
       });
     }
   }
@@ -325,13 +326,8 @@ class _ProfilePageState extends State<ProfilePage> {
           });
           if (mounted) {
             // Check if the widget is still in the tree
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content:
-                    Text(_error ?? 'Image upload failed. Profile not saved.'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            SnackBarUtils.showError(
+                context, _error ?? 'Image upload failed. Profile not saved.');
           }
           return;
         }
@@ -366,12 +362,7 @@ class _ProfilePageState extends State<ProfilePage> {
           .set(userData, SetOptions(merge: true)); // Use set with merge:true
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarUtils.showSuccess(context, 'Profile updated successfully!');
       }
     } on FirebaseException catch (e) {
       // Catch Firestore specific errors

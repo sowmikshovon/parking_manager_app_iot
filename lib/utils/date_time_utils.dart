@@ -21,7 +21,7 @@ class DateTimeUtils {
   static String formatTime(BuildContext context, DateTime dateTime) {
     final MediaQueryData mediaQuery = MediaQuery.of(context);
     final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
-    
+
     return is24HourFormat
         ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
         : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
@@ -38,12 +38,12 @@ class DateTimeUtils {
   static String calculateRemainingTime(DateTime endTime) {
     final now = DateTime.now();
     final remaining = endTime.difference(now);
-    
+
     if (remaining.isNegative) return 'Expired';
-    
+
     final hours = remaining.inHours;
     final minutes = remaining.inMinutes % 60;
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m remaining';
     } else if (minutes > 0) {
@@ -60,7 +60,8 @@ class DateTimeUtils {
 
   /// Checks if a DateTime is in the future by at least the specified minutes
   static bool isFutureByMinutes(DateTime dateTime, int minimumMinutes) {
-    return dateTime.isAfter(DateTime.now().add(Duration(minutes: minimumMinutes)));
+    return dateTime
+        .isAfter(DateTime.now().add(Duration(minutes: minimumMinutes)));
   }
 
   /// Creates a DateTime for the start of today

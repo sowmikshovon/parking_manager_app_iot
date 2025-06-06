@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/snackbar_utils.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -119,12 +120,8 @@ class _SignUpPageState extends State<SignUpPage> {
       }
       if (mounted) {
         Navigator.pop(context); // Go back to LoginPage
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sign up successful! Please log in.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarUtils.showSuccess(
+            context, 'Sign up successful! Please log in.');
       }
     } on FirebaseAuthException catch (e) {
       setState(() {

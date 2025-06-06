@@ -88,7 +88,7 @@ class SnackBarUtils {
 
   /// Shows a custom SnackBar with specified background color and icon
   static void showCustom(
-    BuildContext context, 
+    BuildContext context,
     String message, {
     Color? backgroundColor,
     IconData? icon,
@@ -123,27 +123,30 @@ class SnackBarUtils {
   static void showLocationError(BuildContext context, Object error) {
     final errorString = error.toString();
     String message;
-    
-    if (errorString.contains('No location permissions') || 
+
+    if (errorString.contains('No location permissions') ||
         errorString.contains('permissions')) {
-      message = 'Location permission required. Please enable location access in Settings.';
-    } else if (errorString.contains('Location services') || 
-               errorString.contains('disabled')) {
-      message = 'Location services are disabled. Please enable them in Settings.';
-    } else if (errorString.contains('timeout') || 
-               errorString.contains('TimeoutException')) {
+      message =
+          'Location permission required. Please enable location access in Settings.';
+    } else if (errorString.contains('Location services') ||
+        errorString.contains('disabled')) {
+      message =
+          'Location services are disabled. Please enable them in Settings.';
+    } else if (errorString.contains('timeout') ||
+        errorString.contains('TimeoutException')) {
       message = 'Location request timed out. Please try again.';
     } else {
       message = 'Could not get your location.';
     }
-    
+
     showError(context, message);
   }
 
   /// Shows a Firebase auth error SnackBar with user-friendly message
-  static void showAuthError(BuildContext context, String errorCode, [String? message]) {
+  static void showAuthError(BuildContext context, String errorCode,
+      [String? message]) {
     String userMessage;
-    
+
     switch (errorCode) {
       case 'user-not-found':
         userMessage = 'No account found with this email address.';
@@ -155,7 +158,8 @@ class SnackBarUtils {
         userMessage = 'An account already exists with this email address.';
         break;
       case 'weak-password':
-        userMessage = 'Password is too weak. Please choose a stronger password.';
+        userMessage =
+            'Password is too weak. Please choose a stronger password.';
         break;
       case 'invalid-email':
         userMessage = 'Please enter a valid email address.';
@@ -166,7 +170,7 @@ class SnackBarUtils {
       default:
         userMessage = message ?? 'Authentication failed. Please try again.';
     }
-    
+
     showError(context, userMessage);
   }
 }

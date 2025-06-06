@@ -1,23 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+import '../utils/date_time_utils.dart';
+import '../utils/snackbar_utils.dart';
+import '../widgets/common_widgets.dart';
 import 'qr_scanner_page.dart';
 
 class BookingHistoryPage extends StatelessWidget {
   const BookingHistoryPage({super.key});
-
-  // Helper method to format date and time according to device settings
-  static String _formatDateTime(BuildContext context, DateTime dateTime) {
-    final MediaQueryData mediaQuery = MediaQuery.of(context);
-    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
-
-    final String date = DateFormat.yMd().format(dateTime);
-    final String time = is24HourFormat
-        ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
-        : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
-    return '$date $time';
-  }
 
   // Method to open QR scanner for booked spots in booking history
   static void _openQrScannerForBookingHistory(
@@ -29,50 +19,18 @@ class BookingHistoryPage extends StatelessWidget {
           address: address,
           onSuccess: () {
             // Show success message when QR is successfully scanned
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('QR Code verified successfully!'),
-                  ],
-                ),
-                backgroundColor: Colors.green[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                margin: const EdgeInsets.all(16),
-              ),
-            );
+            SnackBarUtils.showSuccess(
+                context, 'QR Code verified successfully!');
           },
           onSkip: () {
             // Show message when user skips QR scanning
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('QR scanning skipped'),
-                  ],
-                ),
-                backgroundColor: Colors.orange[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                margin: const EdgeInsets.all(16),
-              ),
-            );
+            SnackBarUtils.showWarning(context, 'QR scanning skipped');
           },
         ),
       ),
     );
-  }
+  } // Method to end parking from booking history
 
-  // Method to end parking from booking history
   static Future<void> _endParkingFromHistory(
     BuildContext context,
     String spotId,
@@ -95,23 +53,7 @@ class BookingHistoryPage extends StatelessWidget {
       });
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Parking ended successfully!'),
-              ],
-            ),
-            backgroundColor: Colors.green[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        SnackBarUtils.showSuccess(context, 'Parking ended successfully!');
       }
     } catch (e) {
       // If updating spot availability fails, still try to end the booking
@@ -128,46 +70,18 @@ class BookingHistoryPage extends StatelessWidget {
           });
 
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('Parking ended successfully!'),
-                  ],
-                ),
-                backgroundColor: Colors.green[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                margin: const EdgeInsets.all(16),
-              ),
-            );
+            SnackBarUtils.showSuccess(context, 'Parking ended successfully!');
           }
         } catch (updateError) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Error ending booking: ${updateError.toString()}',
-                ),
-                backgroundColor: Colors.red,
-              ),
-            );
+            SnackBarUtils.showError(
+                context, 'Error ending booking: ${updateError.toString()}');
           }
         }
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to end parking: ${e.toString()}',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarUtils.showError(
+              context, 'Failed to end parking: ${e.toString()}');
         }
       }
     }
@@ -219,13 +133,12 @@ class BookingHistoryPage extends StatelessWidget {
               final startTime = data['startTime'] as Timestamp?;
               final endTime = data['endTime'] as Timestamp?;
               final bookingId = booking.id;
-
               final bool isActive = status == 'active';
               final String startTimeString = startTime != null
-                  ? _formatDateTime(context, startTime.toDate())
+                  ? DateTimeUtils.formatDateTime(context, startTime.toDate())
                   : 'Unknown';
               final String endTimeString = endTime != null
-                  ? _formatDateTime(context, endTime.toDate())
+                  ? DateTimeUtils.formatDateTime(context, endTime.toDate())
                   : 'Ongoing';
 
               return Card(
@@ -246,25 +159,8 @@ class BookingHistoryPage extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? Colors.green.shade100
-                                  : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              isActive ? 'Active' : status.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: isActive
-                                    ? Colors.green.shade700
-                                    : Colors.grey.shade700,
-                              ),
-                            ),
+                          StatusChip(
+                            status: isActive ? 'active' : status,
                           ),
                         ],
                       ),
@@ -300,56 +196,40 @@ class BookingHistoryPage extends StatelessWidget {
                         const SizedBox(height: 16),
                         Row(
                           children: [
-                            // QR Scanner button
                             Expanded(
-                              child: ElevatedButton.icon(
+                              child: ActionButton(
+                                label: "Scan",
+                                icon: Icons.qr_code_scanner,
                                 onPressed: () =>
                                     _openQrScannerForBookingHistory(
                                         context, spotId, address, bookingId),
-                                icon:
-                                    const Icon(Icons.qr_code_scanner, size: 18),
-                                label: const Text(
-                                  'Scan QR',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal.shade600,
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  elevation: 2,
-                                ),
+                                backgroundColor: Colors.teal.shade600,
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // End Parking button
                             Expanded(
-                              child: ElevatedButton.icon(
+                              child: ActionButton(
+                                label: 'Unbook',
+                                icon: Icons.stop_circle_outlined,
                                 onPressed: () => _endParkingFromHistory(
                                     context, spotId, bookingId),
-                                icon: const Icon(Icons.stop_circle_outlined,
-                                    size: 18),
-                                label: const Text(
-                                  'End Parking',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red.shade600,
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  elevation: 2,
-                                ),
+                                backgroundColor: Colors.red.shade600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ActionButton(
+                                label: 'Map',
+                                icon: Icons.navigation,
+                                onPressed: () {
+                                  SnackBarUtils.showCustom(
+                                    context,
+                                    'Work in progress',
+                                    backgroundColor: Colors.blueGrey[700],
+                                    icon: Icons.construction,
+                                  );
+                                },
+                                backgroundColor: Colors.blueGrey,
                               ),
                             ),
                           ],

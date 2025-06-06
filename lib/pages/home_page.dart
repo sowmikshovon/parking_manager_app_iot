@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import '../services/expired_spot_tracker.dart';
+import '../services/dialog_service.dart';
+import '../utils/snackbar_utils.dart';
+import '../utils/date_time_utils.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
 import 'qr_scanner_page.dart';
@@ -34,15 +36,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error checking expired spots on HomePage load: $e');
     }
-  }
-
-  // Helper method to format just time according to device settings
-  static String _formatTime(BuildContext context, DateTime dateTime) {
-    final MediaQueryData mediaQuery = MediaQuery.of(context);
-    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
-    return is24HourFormat
-        ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
-        : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
   }
 
   Widget _buildHomeButton(
@@ -140,7 +133,7 @@ class _HomePageState extends State<HomePage> {
     required String address,
     required String timeString,
     required String bookingId,
-    required String expectedEndTime, // This now contains remaining time
+    required String expectedEndTime,
   }) {
     return Card(
       elevation: 4,
@@ -297,6 +290,34 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8), // More button (work in progress)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        SnackBarUtils.showCustom(
+                          context,
+                          'Work in progress',
+                          backgroundColor: Colors.blueGrey[700],
+                          icon: Icons.construction,
+                        );
+                      },
+                      icon: const Icon(Icons.navigation, size: 18),
+                      label: const Text(
+                        'Navigate',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueGrey,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 2,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -315,44 +336,11 @@ class _HomePageState extends State<HomePage> {
           expectedSpotId: spotId,
           address: address,
           onSuccess: () {
-            // Show success message when QR is successfully scanned
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('QR Code verified successfully!'),
-                  ],
-                ),
-                backgroundColor: Colors.green[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                margin: const EdgeInsets.all(16),
-              ),
-            );
+            SnackBarUtils.showSuccess(
+                context, 'QR Code verified successfully!');
           },
           onSkip: () {
-            // Show message when user skips QR scanning
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('QR scanning skipped'),
-                  ],
-                ),
-                backgroundColor: Colors.orange[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                margin: const EdgeInsets.all(16),
-              ),
-            );
+            SnackBarUtils.showWarning(context, 'QR scanning skipped');
           },
         ),
       ),
@@ -365,112 +353,9 @@ class _HomePageState extends State<HomePage> {
     String address,
     String bookingId,
   ) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await DialogService.showUnbookDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.orange.shade600,
-              size: 28,
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Unbook Spot',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to unbook this parking spot?',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.orange.shade700,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Address:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade700,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    address,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'This will make the spot available for others to book.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[600],
-            ),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade600,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Unbook'),
-          ),
-        ],
-      ),
+      address: address,
     );
 
     if (confirmed == true) {
@@ -500,23 +385,8 @@ class _HomePageState extends State<HomePage> {
       });
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Parking spot successfully unbooked!'),
-              ],
-            ),
-            backgroundColor: Colors.green[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        SnackBarUtils.showSuccess(
+            context, 'Parking spot successfully unbooked!');
       }
     } catch (e) {
       // Handle the case where spot might not exist
@@ -532,37 +402,18 @@ class _HomePageState extends State<HomePage> {
             'note': 'Parking spot no longer available',
           });
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Booking ended (spot no longer available)',
-                ),
-                backgroundColor: Colors.orange,
-              ),
-            );
+            SnackBarUtils.showWarning(
+                context, 'Booking ended (spot no longer available)');
           }
         } catch (updateError) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Error ending booking: ${updateError.toString()}',
-                ),
-                backgroundColor: Colors.red,
-              ),
-            );
+            SnackBarUtils.showError(
+                context, 'Error ending booking: ${updateError.toString()}');
           }
         }
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to unbook: ${e.toString()}',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarUtils.showError(context, 'Failed to unbook: ${e.toString()}');
         }
       }
     }
@@ -775,7 +626,8 @@ class _HomePageState extends State<HomePage> {
                           data['address'] as String? ?? 'No address';
                       final startTime =
                           (data['startTime'] as Timestamp).toDate();
-                      final timeString = _formatTime(context, startTime);
+                      final timeString =
+                          DateTimeUtils.formatTime(context, startTime);
                       final spotId = data['spotId'] as String? ?? '';
                       final bookingId = booking.id;
 

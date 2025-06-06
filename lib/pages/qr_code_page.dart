@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../qr_pdf_util.dart';
+import '../utils/qr_pdf_util.dart';
 import 'home_page.dart';
 
 class QrCodePage extends StatelessWidget {

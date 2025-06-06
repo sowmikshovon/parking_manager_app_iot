@@ -61,7 +61,7 @@ class UserService {
     return Result.execute(() async {
       ErrorHandler.validateEmail(email);
       ErrorHandler.validatePassword(password);
-      
+
       if (password != confirmPassword) {
         throw const ValidationException('Passwords do not match');
       }
@@ -216,9 +216,11 @@ class UserService {
 
       if (firstName != null) updateData['firstName'] = firstName.trim();
       if (lastName != null) updateData['lastName'] = lastName.trim();
-      if (dateOfBirth != null) updateData['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+      if (dateOfBirth != null)
+        updateData['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
       if (gender != null) updateData['gender'] = gender;
-      if (profileImageUrl != null) updateData['profileImageUrl'] = profileImageUrl;
+      if (profileImageUrl != null)
+        updateData['profileImageUrl'] = profileImageUrl;
 
       // Update profile
       await updateUserProfile(updateData);
@@ -240,7 +242,9 @@ class UserService {
         throw ValidationException(imageError);
       }
 
-      final fileSizeError = ValidationUtils.validateFileSize(imageFile.lengthSync(), maxSizeMB: AppConfig.maxImageSizeMB);
+      final fileSizeError = ValidationUtils.validateFileSize(
+          imageFile.lengthSync(),
+          maxSizeMB: AppConfig.maxImageSizeMB);
       if (fileSizeError != null) {
         throw ValidationException(fileSizeError);
       }
@@ -251,10 +255,8 @@ class UserService {
       final filename = '${user.uid}_$timestamp.$extension';
 
       // Upload to Firebase Storage
-      final storageRef = _storage
-          .ref()
-          .child(AppConfig.profileImagesPath)
-          .child(filename);
+      final storageRef =
+          _storage.ref().child(AppConfig.profileImagesPath).child(filename);
 
       final uploadTask = storageRef.putFile(imageFile);
       final snapshot = await uploadTask;
@@ -277,7 +279,8 @@ class UserService {
 
       // Get current profile to find image URL
       final profileResult = await getUserProfile();
-      if (profileResult.isSuccess && profileResult.data?.profileImageUrl != null) {
+      if (profileResult.isSuccess &&
+          profileResult.data?.profileImageUrl != null) {
         try {
           // Delete from Firebase Storage
           final ref = _storage.refFromURL(profileResult.data!.profileImageUrl!);
@@ -323,7 +326,7 @@ class UserService {
   static Future<Result<bool>> isEmailRegistered(String email) async {
     return Result.execute(() async {
       ErrorHandler.validateEmail(email);
-      
+
       try {
         final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
         return methods.isNotEmpty;
@@ -385,7 +388,7 @@ class UserService {
   static List<String> getUserAuthMethods() {
     final user = currentUser;
     if (user == null) return [];
-    
+
     return user.providerData.map((info) => info.providerId).toList();
   }
 
@@ -423,7 +426,8 @@ class UserService {
   }
 
   /// Re-authenticate user (required for sensitive operations)
-  static Future<Result<void>> reauthenticateWithPassword(String password) async {
+  static Future<Result<void>> reauthenticateWithPassword(
+      String password) async {
     return Result.execute(() async {
       final user = currentUser;
       if (user == null) {
@@ -438,7 +442,7 @@ class UserService {
         email: user.email!,
         password: password,
       );
-      
+
       await user.reauthenticateWithCredential(credential);
     });
   }
@@ -473,9 +477,9 @@ class UserService {
       }
 
       final profile = profileResult.data!;
-      return profile.firstName != null && 
-             profile.lastName != null && 
-             profile.dateOfBirth != null;
+      return profile.firstName != null &&
+          profile.lastName != null &&
+          profile.dateOfBirth != null;
     });
   }
 }
@@ -498,13 +502,13 @@ class AuthNotifier extends ChangeNotifier {
   void _initAuthListener() {
     UserService.authStateChanges.listen((user) async {
       _user = user;
-      
+
       if (user != null) {
         await _loadUserProfile();
       } else {
         _profile = null;
       }
-      
+
       notifyListeners();
     });
   }

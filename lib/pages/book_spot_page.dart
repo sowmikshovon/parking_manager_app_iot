@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/location_service.dart';
 import '../services/expired_spot_tracker.dart';
+import '../utils/snackbar_utils.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
 import 'home_page.dart';
@@ -130,25 +131,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
           .collection('parking_spots')
           .doc(spotId)
           .update({'isAvailable': false});
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Parking spot booked successfully!'),
-              ],
-            ),
-            backgroundColor: Colors.green[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        ); // Redirect to homepage after successful booking
+        SnackBarUtils.showSuccess(context, 'Parking spot booked successfully!');
+        // Redirect to homepage after successful booking
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const HomePage()),
           (route) => false,
@@ -210,12 +195,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
       } else {
         print('Map controller is not initialized');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Map is not ready yet. Please try again.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          SnackBarUtils.showWarning(
+              context, 'Map is not ready yet. Please try again.');
         }
       }
     } catch (e) {
@@ -236,16 +217,15 @@ class _BookSpotPageState extends State<BookSpotPage> {
             e.toString().contains('TimeoutException')) {
           errorMessage = 'Location request timed out. Please try again.';
         }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: () => _moveToUserLocation(),
-            ),
+        SnackBarUtils.showCustom(
+          context,
+          errorMessage,
+          backgroundColor: Colors.red,
+          icon: Icons.error,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () => _moveToUserLocation(),
           ),
         );
       }
@@ -528,29 +508,12 @@ class _BookSpotPageState extends State<BookSpotPage> {
                     ),
                     onTap: () {
                       // Show unavailable message for expired spots
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.info_outline,
-                                  color: Colors.white),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'This spot is unavailable. Please look for another one.',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                              ),
-                            ],
-                          ),
-                          backgroundColor: Colors.orange.shade600,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                          duration: const Duration(seconds: 3),
-                        ),
+                      SnackBarUtils.showCustom(
+                        context,
+                        'This spot is unavailable. Please look for another one.',
+                        backgroundColor: Colors.orange.shade600,
+                        icon: Icons.info_outline,
+                        duration: const Duration(seconds: 3),
                       );
                       // Clear any selected spot
                       setState(() {

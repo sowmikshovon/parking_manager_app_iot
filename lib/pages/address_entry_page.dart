@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+import '../utils/date_time_utils.dart';
+import '../utils/snackbar_utils.dart';
+import 'qr_code_page.dart';
 
 class AddressEntryPage extends StatefulWidget {
   final LatLng selectedLatLng;
@@ -17,22 +19,10 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
   final _addressController = TextEditingController();
   DateTime? _selectedDateTime;
   bool _isLoading = false;
-
   @override
   void dispose() {
     _addressController.dispose();
     super.dispose();
-  }
-
-  String _formatDateTime(BuildContext context, DateTime dateTime) {
-    final MediaQueryData mediaQuery = MediaQuery.of(context);
-    final bool is24HourFormat = mediaQuery.alwaysUse24HourFormat;
-
-    final String date = DateFormat.yMd().format(dateTime);
-    final String time = is24HourFormat
-        ? DateFormat('HH:mm').format(dateTime) // 24-hour format (14:30)
-        : DateFormat('h:mm a').format(dateTime); // 12-hour format (2:30 PM)
-    return '$date $time';
   }
 
   Future<void> _selectDateTime(BuildContext context) async {
@@ -72,26 +62,14 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
       return;
     }
     if (_selectedDateTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Please select the date and time the spot will be available until.'),
-          backgroundColor: Colors.orangeAccent,
-        ),
-      );
+      SnackBarUtils.showWarning(context,
+          'Please select the date and time the spot will be available until.');
       return;
-    }
-
-    // Ensure the selected date and time is in the future
+    } // Ensure the selected date and time is in the future
     if (_selectedDateTime!
         .isBefore(DateTime.now().add(const Duration(minutes: 5)))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Availability must be at least 5 minutes in the future.'),
-          backgroundColor: Colors.orangeAccent,
-        ),
-      );
+      SnackBarUtils.showWarning(
+          context, 'Availability must be at least 5 minutes in the future.');
       return;
     }
 
@@ -99,12 +77,8 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('You must be logged in to list a spot.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarUtils.showError(
+            context, 'You must be logged in to list a spot.');
       }
       setState(() => _isLoading = false);
       return;
@@ -120,25 +94,23 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
         'ownerId': user.uid,
         'created_at': FieldValue.serverTimestamp(),
         'userEmail': user.email,
+      }).then((docRef) async {
+        if (mounted) {
+          SnackBarUtils.showSuccess(
+              context, 'Parking spot listed successfully!');
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => QrCodePage(
+                spotId: docRef.id,
+                address: _addressController.text,
+              ),
+            ),
+          );
+        }
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Parking spot listed successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context); // Go back to the previous screen
-      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error listing spot: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarUtils.showError(context, 'Error listing spot: $e');
       }
     } finally {
       if (mounted) {
@@ -213,7 +185,7 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                         child: Text(
                           _selectedDateTime == null
                               ? 'Select Date & Time'
-                              : 'Ends: ${_formatDateTime(context, _selectedDateTime!)}',
+                              : 'Ends: ${DateTimeUtils.formatDateTime(context, _selectedDateTime!)}',
                           style:
                               Theme.of(context).textTheme.bodyLarge?.copyWith(
                                     color: _selectedDateTime == null

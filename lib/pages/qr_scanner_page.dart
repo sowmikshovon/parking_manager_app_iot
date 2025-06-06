@@ -209,3 +209,36 @@ class _QrScannerPageState extends State<QrScannerPage> {
     );
   }
 }
+
+class QrInstructionCard extends StatelessWidget {
+  final String address;
+  const QrInstructionCard({super.key, required this.address});
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(Icons.qr_code_scanner, size: 32, color: Colors.teal.shade700),
+            const SizedBox(height: 8),
+            Text(
+              'Scan QR Code for:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal.shade800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              address,
+              style: const TextStyle(fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

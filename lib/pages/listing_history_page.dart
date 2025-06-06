@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+import '../utils/date_time_utils.dart';
+import '../utils/snackbar_utils.dart';
 import 'qr_code_page.dart';
+import '../services/dialog_service.dart';
 
 class ListingHistoryPage extends StatelessWidget {
   const ListingHistoryPage({super.key});
@@ -133,7 +135,7 @@ class ListingHistoryPage extends StatelessWidget {
                       ),
                       if (availableUntil != null)
                         Text(
-                          'Available until: ${DateFormat.yMd().add_jm().format(availableUntil)}',
+                          'Available until: ${DateTimeUtils.formatDateTime(context, availableUntil)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -174,30 +176,23 @@ class ListingHistoryPage extends StatelessWidget {
                         icon: const Icon(Icons.delete, color: Colors.red),
                         tooltip: 'Delete Listing',
                         onPressed: () async {
-                          final confirm = await showDialog<bool>(
+                          // Check for active booking before showing confirm dialog
+                          final activeBooking = await FirebaseFirestore.instance
+                              .collection('bookings')
+                              .where('spotId', isEqualTo: spotId)
+                              .where('status', isEqualTo: 'active')
+                              .limit(1)
+                              .get();
+                          final bool isBooked = activeBooking.docs.isNotEmpty;
+
+                          final confirm =
+                              await DialogService.showDeleteWarningDialog(
                             context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Delete Listing'),
-                              content: const Text(
-                                'Are you sure you want to delete this listing?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(true),
-                                  child: const Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            title: 'Delete Listing',
+                            address: address,
+                            hasActiveBooking: isBooked,
                           );
+
                           if (confirm == true) {
                             try {
                               await FirebaseFirestore.instance
@@ -205,23 +200,13 @@ class ListingHistoryPage extends StatelessWidget {
                                   .doc(spotId)
                                   .delete();
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Listing deleted.'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                SnackBarUtils.showSuccess(
+                                    context, 'Listing deleted.');
                               }
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Failed to delete: ${e.toString()}',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                SnackBarUtils.showError(context,
+                                    'Failed to delete: ${e.toString()}');
                               }
                             }
                           }
@@ -346,7 +331,7 @@ class ListingHistoryPage extends StatelessWidget {
                   title: Text(
                     selectedDateTime == null
                         ? 'Select new availability end time'
-                        : 'Available until: ${DateFormat.yMd().add_jm().format(selectedDateTime!)}',
+                        : 'Available until: ${DateTimeUtils.formatDateTime(context, selectedDateTime!)}',
                     style: TextStyle(
                       color: selectedDateTime == null
                           ? Colors.grey[600]
@@ -431,46 +416,13 @@ class ListingHistoryPage extends StatelessWidget {
       });
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Text(
-                    'Availability updated until ${DateFormat.yMd().add_jm().format(newAvailableUntil)}'),
-              ],
-            ),
-            backgroundColor: Colors.green[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        SnackBarUtils.showSuccess(context,
+            'Availability updated until ${DateTimeUtils.formatDateTime(context, newAvailableUntil)}');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Failed to update availability: ${e.toString()}'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        SnackBarUtils.showError(
+            context, 'Failed to update availability: ${e.toString()}');
       }
     }
   }
