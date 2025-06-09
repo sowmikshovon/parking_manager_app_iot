@@ -5,33 +5,52 @@ import '../utils/date_time_utils.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/app_constants.dart';
 import '../services/error_service.dart';
+import '../services/booking_service.dart';
 import '../widgets/common_widgets.dart';
-import 'qr_scanner_page.dart';
+import 'qr_scanner_with_bluetooth_page.dart';
 
-class BookingHistoryPage extends StatelessWidget {
+class BookingHistoryPage extends StatefulWidget {
   const BookingHistoryPage({super.key});
 
+  @override
+  State<BookingHistoryPage> createState() => _BookingHistoryPageState();
+}
+
+class _BookingHistoryPageState extends State<BookingHistoryPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Check for expired bookings when the page loads
+    _checkExpiredBookings();
+  }
+
+  // Check and cleanup expired bookings
+  Future<void> _checkExpiredBookings() async {
+    await ErrorService.executeWithErrorHandling<void>(
+      context,
+      () async {
+        await BookingService.checkAndExpireBookings();
+      },
+      operationName: 'Check expired bookings',
+      showSnackBar: false, // Silent background operation
+    );
+  }
+
   // Method to open QR scanner for booked spots in booking history
-  static void _openQrScannerForBookingHistory(
+  void _openQrScannerForBookingHistory(
       BuildContext context, String spotId, String address, String bookingId) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => QrScannerPage(
-          expectedSpotId: spotId,
-          address: address,          onSuccess: () {
-            // Show success message when QR is successfully scanned
-            SnackBarUtils.showSuccess(
-                context, AppStrings.qrCodeVerifiedSuccessfully);
-          },
-          onSkip: () {
-            // Show message when user skips QR scanning
-            SnackBarUtils.showWarning(context, AppStrings.qrScanningSkipped);
-          },
+        builder: (context) => QrScannerWithBluetoothPage(
+          bookingId: bookingId,
+          address: address,
         ),
       ),
     );
-  }  // Method to end parking from booking history
-  static Future<void> _endParkingFromHistory(
+  }
+
+  // Method to end parking from booking history
+  Future<void> _endParkingFromHistory(
     BuildContext context,
     String spotId,
     String bookingId,
@@ -55,9 +74,9 @@ class BookingHistoryPage extends StatelessWidget {
         });
 
         if (context.mounted) {
-          SnackBarUtils.showSuccess(context, AppStrings.parkingEndedSuccessfully);
-        }
-      },
+          SnackBarUtils.showSuccess(
+              context, AppStrings.parkingEndedSuccessfully);
+        }      },
       operationName: AppStrings.endParkingOperation,
     );
   }
@@ -66,7 +85,8 @@ class BookingHistoryPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return Scaffold(        appBar: AppBar(title: Text(AppStrings.myBookingHistory)),
+      return Scaffold(
+        appBar: AppBar(title: Text(AppStrings.myBookingHistory)),
         body: Center(
           child: Text(AppStrings.pleaseLogInBookingHistory),
         ),
@@ -90,14 +110,14 @@ class BookingHistoryPage extends StatelessWidget {
           }
 
           final bookings = snapshot.data?.docs ?? [];
-          if (bookings.isEmpty) {            return Center(
+          if (bookings.isEmpty) {
+            return Center(
               child: Text(AppStrings.noBookingHistoryFound),
             );
           }
 
           return ListView.builder(
-            itemCount: bookings.length,
-            itemBuilder: (context, index) {
+            itemCount: bookings.length,            itemBuilder: (context, index) {
               final booking = bookings[index];
               final data = booking.data() as Map<String, dynamic>;
               final address = data['address'] as String? ?? 'No address';
@@ -106,14 +126,29 @@ class BookingHistoryPage extends StatelessWidget {
               final startTime = data['startTime'] as Timestamp?;
               final endTime = data['endTime'] as Timestamp?;
               final bookingId = booking.id;
-              final bool isActive = status == 'active';              final String startTimeString = startTime != null
+              
+              // Check if booking has actually expired (for active bookings)
+              bool actuallyExpired = false;
+              if (status == 'active') {
+                // Check if this is an active booking that should be expired
+                // by looking at parking spot's availableUntil time or endTime
+                if (endTime != null) {
+                  actuallyExpired = endTime.toDate().isBefore(DateTime.now());
+                } else {
+                  // For bookings without endTime, check spot's availableUntil
+                  // This will be handled in a FutureBuilder below
+                }
+              }
+              
+              final String displayStatus = actuallyExpired ? 'expired' : status;
+              final bool isActive = displayStatus == 'active';
+              
+              final String startTimeString = startTime != null
                   ? DateTimeUtils.formatDateTime(context, startTime.toDate())
                   : AppStrings.unknown;
               final String endTimeString = endTime != null
                   ? DateTimeUtils.formatDateTime(context, endTime.toDate())
-                  : AppStrings.ongoing;
-
-              return Card(
+                  : AppStrings.ongoing;              return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -130,9 +165,38 @@ class BookingHistoryPage extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),                          StatusChip(
-                            status: isActive ? AppStrings.activeStatus : status,
                           ),
+                          // Use FutureBuilder to check if active booking is actually expired
+                          if (status == 'active' && !actuallyExpired)
+                            FutureBuilder<DocumentSnapshot>(
+                              future: FirebaseFirestore.instance
+                                  .collection('parking_spots')
+                                  .doc(spotId)
+                                  .get(),
+                              builder: (context, spotSnapshot) {
+                                String finalStatus = displayStatus;
+                                
+                                if (spotSnapshot.hasData && spotSnapshot.data!.exists) {
+                                  final spotData = spotSnapshot.data!.data() as Map<String, dynamic>;
+                                  final availableUntilTimestamp = spotData['availableUntil'] as Timestamp?;
+                                  
+                                  if (availableUntilTimestamp != null) {
+                                    final availableUntil = availableUntilTimestamp.toDate();
+                                    if (availableUntil.isBefore(DateTime.now())) {
+                                      finalStatus = 'expired';
+                                      // Trigger expiration check for this booking
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        _checkExpiredBookings();
+                                      });
+                                    }
+                                  }
+                                }
+                                
+                                return StatusChip(status: finalStatus);
+                              },
+                            )
+                          else
+                            StatusChip(status: displayStatus),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -162,47 +226,72 @@ class BookingHistoryPage extends StatelessWidget {
                             ),
                           ],
                         ),
-                      ],
-                      if (isActive) ...[
+                      ],                      if (isActive && !actuallyExpired) ...[
                         const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ActionButton(
-                                label: AppStrings.scanLabel,
-                                icon: Icons.qr_code_scanner,
-                                onPressed: () =>
-                                    _openQrScannerForBookingHistory(
-                                        context, spotId, address, bookingId),
-                                backgroundColor: Colors.teal.shade600,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ActionButton(
-                                label: AppStrings.unbookMenuItem,
-                                icon: Icons.stop_circle_outlined,
-                                onPressed: () => _endParkingFromHistory(
-                                    context, spotId, bookingId),
-                                backgroundColor: Colors.red.shade600,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ActionButton(
-                                label: AppStrings.mapLabel,
-                                icon: Icons.navigation,
-                                onPressed: () {                                  SnackBarUtils.showCustom(
-                                    context,
-                                    AppStrings.workInProgress,
-                                    backgroundColor: Colors.blueGrey[700],
-                                    icon: Icons.construction,
-                                  );
-                                },
-                                backgroundColor: Colors.blueGrey,
-                              ),
-                            ),
-                          ],
+                        // Check if booking is still actually active (not expired)
+                        FutureBuilder<DocumentSnapshot>(
+                          future: FirebaseFirestore.instance
+                              .collection('parking_spots')
+                              .doc(spotId)
+                              .get(),
+                          builder: (context, spotSnapshot) {
+                            bool shouldShowActions = true;
+                            
+                            if (spotSnapshot.hasData && spotSnapshot.data!.exists) {
+                              final spotData = spotSnapshot.data!.data() as Map<String, dynamic>;
+                              final availableUntilTimestamp = spotData['availableUntil'] as Timestamp?;
+                              
+                              if (availableUntilTimestamp != null) {
+                                final availableUntil = availableUntilTimestamp.toDate();
+                                shouldShowActions = availableUntil.isAfter(DateTime.now());
+                              }
+                            }
+                            
+                            if (!shouldShowActions) {
+                              return const SizedBox.shrink();
+                            }
+                            
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: ActionButton(
+                                    label: AppStrings.scanLabel,
+                                    icon: Icons.qr_code_scanner,
+                                    onPressed: () =>
+                                        _openQrScannerForBookingHistory(
+                                            context, spotId, address, bookingId),
+                                    backgroundColor: Colors.teal.shade600,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ActionButton(
+                                    label: AppStrings.unbookMenuItem,
+                                    icon: Icons.stop_circle_outlined,
+                                    onPressed: () => _endParkingFromHistory(
+                                        context, spotId, bookingId),
+                                    backgroundColor: Colors.red.shade600,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ActionButton(
+                                    label: AppStrings.mapLabel,
+                                    icon: Icons.navigation,
+                                    onPressed: () {
+                                      SnackBarUtils.showCustom(
+                                        context,
+                                        AppStrings.workInProgress,
+                                        backgroundColor: Colors.blueGrey[700],
+                                        icon: Icons.construction,
+                                      );
+                                    },
+                                    backgroundColor: Colors.blueGrey,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ],

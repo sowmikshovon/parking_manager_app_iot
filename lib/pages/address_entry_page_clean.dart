@@ -7,6 +7,7 @@ import '../utils/snackbar_utils.dart';
 import '../utils/error_handler.dart';
 import '../utils/app_constants.dart';
 import '../services/error_service.dart';
+import '../services/booking_service.dart';
 import 'qr_code_page.dart';
 
 class AddressEntryPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
   final _addressController = TextEditingController();
   DateTime? _selectedDateTime;
   bool _isLoading = false;
+
   @override
   void dispose() {
     _addressController.dispose();
@@ -62,6 +64,16 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
 
   Future<void> _submitSpot() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Check for existing active bookings before allowing new spot creation
+    final hasActiveBooking = await BookingService.hasActiveBookings();
+    if (hasActiveBooking) {
+      if (mounted) {
+        SnackBarUtils.showWarning(context,
+            'You already have an active booking. Please complete your current booking before listing a new spot.\n\nNote: Multiple simultaneous bookings are not supported in this version. This feature may be added in future updates.');
+      }
       return;
     }
 
@@ -106,34 +118,34 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
       () async {
         final docRef =
             await FirebaseFirestore.instance.collection('parking_spots').add({
+          'ownerId': user.uid,
+          'ownerEmail': user.email,
           'address': _addressController.text,
           'latitude': widget.selectedLatLng.latitude,
           'longitude': widget.selectedLatLng.longitude,
-          'isAvailable': true,
           'availableUntil': Timestamp.fromDate(_selectedDateTime!),
-          'ownerId': user.uid,
-          'created_at': FieldValue.serverTimestamp(),
-          'userEmail': user.email,
+          'isAvailable': true,
+          'createdAt': Timestamp.now(),
         });
-        return docRef;
+
+        return docRef.id;
       },
       operationName: ErrorStrings.spotListingOperationName,
+      showSnackBar: true,
     );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
+    setState(() => _isLoading = false);
 
-      if (result != null) {
-        SnackBarUtils.showSuccess(context, 'Parking spot listed successfully!');
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => QrCodePage(
-              spotId: result.id,
-              address: _addressController.text,
-            ),
+    if (result != null && mounted) {
+      // Navigate to QR code page on successful listing
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => QrCodePage(
+            spotId: result,
+            address: _addressController.text,
           ),
-        );
-      }
+        ),
+      );
     }
   }
 
@@ -199,7 +211,6 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: <Widget>[
                       Expanded(
-                        // Wrap the Text widget with Expanded
                         child: Text(
                           _selectedDateTime == null
                               ? 'Select Date & Time'
@@ -210,7 +221,7 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                                         ? Theme.of(context).hintColor
                                         : null,
                                   ),
-                          overflow: TextOverflow.ellipsis, // Prevent overflow
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const Icon(Icons.calendar_today),
@@ -227,7 +238,8 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                         color: Theme.of(context).colorScheme.error,
                         fontSize: 12),
                   ),
-                ),              const SizedBox(height: 30),
+                ),
+              const SizedBox(height: 30),
               ElevatedButton.icon(
                 icon: _isLoading
                     ? const SizedBox(
@@ -238,11 +250,13 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                     : const Icon(Icons.check_circle_outline),
                 label:
                     Text(_isLoading ? 'LISTING...' : 'CONFIRM AND LIST SPOT'),
-                onPressed: _isLoading ? null : _submitSpot,                style: ElevatedButton.styleFrom(
+                onPressed: _isLoading ? null : _submitSpot,
+                style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   textStyle: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),                ),              ),
-              const SizedBox(height: 16),
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
         ),

@@ -7,7 +7,8 @@ import '../widgets/common_widgets.dart';
 
 /// Centralized error handling service for the parking manager application
 /// Provides consistent error handling, user feedback, and error logging
-class ErrorService {  /// Handle Firebase authentication errors with user feedback
+class ErrorService {
+  /// Handle Firebase authentication errors with user feedback
   static void handleAuthError(
     BuildContext context,
     dynamic error, {
@@ -31,6 +32,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       }
     }
   }
+
   /// Handle Firestore database errors with user feedback
   static void handleFirestoreError(
     BuildContext context,
@@ -51,6 +53,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       SnackBarUtils.showError(context, errorMessage);
     }
   }
+
   /// Handle location-related errors with user feedback
   static void handleLocationError(
     BuildContext context,
@@ -72,6 +75,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       SnackBarUtils.showLocationError(context, error);
     }
   }
+
   /// Handle generic errors with user feedback
   static void handleGenericError(
     BuildContext context,
@@ -97,6 +101,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       SnackBarUtils.showError(context, errorMessage);
     }
   }
+
   /// Handle network errors with user feedback and retry option
   static void handleNetworkError(
     BuildContext context,
@@ -130,6 +135,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       );
     }
   }
+
   /// Handle booking-related errors specifically
   static void handleBookingError(
     BuildContext context,
@@ -154,6 +160,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       SnackBarUtils.showError(context, errorMessage);
     }
   }
+
   /// Handle spot listing errors specifically
   static void handleSpotListingError(
     BuildContext context,
@@ -175,6 +182,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       SnackBarUtils.showError(context, errorMessage);
     }
   }
+
   /// Execute an operation with error handling
   static Future<T?> executeWithErrorHandling<T>(
     BuildContext context,
@@ -243,7 +251,9 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       }
       return null;
     }
-  }  /// Execute an operation with retry logic and error handling
+  }
+
+  /// Execute an operation with retry logic and error handling
   static Future<T?> executeWithRetry<T>(
     BuildContext context,
     Future<T> Function() operation, {
@@ -272,6 +282,7 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
       return null;
     }
   }
+
   /// Get location-specific error message
   static String _getLocationErrorMessage(dynamic error) {
     final errorString = error.toString();
@@ -303,7 +314,8 @@ class ErrorService {  /// Handle Firebase authentication errors with user feedba
 
     if (password != null) {
       ErrorHandler.validatePassword(password);
-    }    if (address != null && address.trim().isEmpty) {
+    }
+    if (address != null && address.trim().isEmpty) {
       throw const ValidationException(ErrorStrings.addressRequired);
     }
 

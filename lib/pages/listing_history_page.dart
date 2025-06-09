@@ -77,8 +77,17 @@ class ListingHistoryPage extends StatelessWidget {
                       Row(
                         children: [
                           Text(AppStrings.statusPrefix),
-                          if (!isAvailable)
-                            // Use StreamBuilder to check for active bookings
+                          if (isTimeExpired)
+                            // Show expired status for time-expired spots
+                            Text(
+                              AppStrings.expired,
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          else if (!isAvailable)
+                            // Use StreamBuilder to check for active bookings (only for non-expired unavailable spots)
                             StreamBuilder<QuerySnapshot>(
                               stream: FirebaseFirestore.instance
                                   .collection('bookings')
@@ -138,23 +147,37 @@ class ListingHistoryPage extends StatelessWidget {
                           ),
                         ),
                     ],
-                  ),
-                  trailing: Row(
+                  ),                  trailing: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Re-enable button for expired spots
-                      if (isTimeExpired && isAvailable)                        IconButton(
+                    children: [                      // Re-enable button for expired spots (show for all expired spots, regardless of isAvailable status)
+                      if (isTimeExpired)
+                        IconButton(
                           icon: const Icon(Icons.refresh, color: Colors.green),
                           tooltip: AppStrings.reEnable,
                           onPressed: () =>
                               _showReEnableDialog(context, spotId, address),
                         ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        tooltip: AppStrings.editAvailabilityLabel,
-                        onPressed: () => _showEditAvailabilityDialog(context,
-                            spotId, availableUntil, isAvailable, address),
-                      ),
+                      // Edit button - only available for non-expired spots (available or booked)
+                      if (!isTimeExpired)
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          tooltip: AppStrings.editAvailabilityLabel,
+                          onPressed: () async {
+                            // Check for active booking before showing dialog
+                            final activeBooking = await FirebaseFirestore.instance
+                                .collection('bookings')
+                                .where('spotId', isEqualTo: spotId)
+                                .where('status', isEqualTo: 'active')
+                                .limit(1)
+                                .get();
+                            final bool hasActiveBooking = activeBooking.docs.isNotEmpty;
+                            
+                            if (context.mounted) {
+                              _showEditAvailabilityDialog(context,
+                                  spotId, availableUntil, isAvailable, address, hasActiveBooking);
+                            }
+                          },
+                        ),
                       IconButton(
                         icon: const Icon(Icons.qr_code, color: Colors.teal),
                         tooltip: AppStrings.showQrLabel,
@@ -214,27 +237,59 @@ class ListingHistoryPage extends StatelessWidget {
       ),
     );
   }
-
   // Method to show re-enable availability dialog for expired spots
   static Future<void> _showReEnableDialog(
     BuildContext context,
     String spotId,
     String address,
-  ) async {    final confirm = await showDialog<bool>(
+  ) async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(AppStrings.reEnable),
+        title: Row(
+          children: [
+            Icon(Icons.schedule, color: Colors.orange.shade600),
+            const SizedBox(width: 8),
+            Text('Spot Expired'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${AppStrings.addressOrDescription}: $address'),
+            Text(
+              'Address: $address',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
             const SizedBox(height: 16),
-            const Text(
-                'This spot\'s availability has expired. Would you like to set a new availability period?'),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This parking spot\'s availability time has expired. Set a new availability period to make it active again.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
-        ),
-        actions: [
+        ),        actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(AppStrings.cancel),
@@ -245,13 +300,18 @@ class ListingHistoryPage extends StatelessWidget {
               backgroundColor: Colors.green.shade600,
               foregroundColor: Colors.white,
             ),
-            child: Text(AppStrings.reEnable),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule, size: 18),
+                const SizedBox(width: 4),
+                Text('Set New Time'),
+              ],
+            ),
           ),
         ],
-      ),    );
-
-    if (confirm == true && context.mounted) {
-      _showEditAvailabilityDialog(context, spotId, null, true, address);
+      ),    );    if (confirm == true && context.mounted) {
+      _showEditAvailabilityDialog(context, spotId, null, true, address, false);
     }
   }
 
@@ -262,13 +322,16 @@ class ListingHistoryPage extends StatelessWidget {
     DateTime? currentAvailableUntil,
     bool isAvailable,
     String address,
+    bool hasActiveBooking,
   ) async {
-    DateTime? selectedDateTime = currentAvailableUntil;
-
-    await showDialog(
+    DateTime? selectedDateTime = currentAvailableUntil;    await showDialog(
       context: context,      builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text(AppStrings.editAvailabilityTitle),
+          title: Text(
+            currentAvailableUntil == null || currentAvailableUntil.isBefore(DateTime.now())
+                ? 'Set Availability Time'
+                : AppStrings.editAvailabilityTitle
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,9 +342,8 @@ class ListingHistoryPage extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: Colors.grey[700],
                 ),
-              ),
-              const SizedBox(height: 16),
-              if (!isAvailable)
+              ),              const SizedBox(height: 16),
+              if (hasActiveBooking)
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(

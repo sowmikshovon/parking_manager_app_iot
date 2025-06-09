@@ -45,7 +45,8 @@ class _LoginPageState extends State<LoginPage> {
     final result = await ErrorService.executeWithErrorHandling<User?>(
       context,
       () async {
-        final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        final userCredential =
+            await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: email,
           password: password,
         );

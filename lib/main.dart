@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-import './pages/login_page.dart';
+import './pages/permission_setup_page.dart';
 import './services/expired_spot_tracker.dart';
+import './services/booking_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,8 +12,32 @@ void main() async {
 
   // Start global expired spot tracking
   ExpiredSpotTracker.startGlobalTracking();
+  
+  // Start periodic booking expiration checking
+  _startBookingExpirationChecking();
 
   runApp(const MyApp());
+}
+
+/// Start periodic checking for expired bookings
+void _startBookingExpirationChecking() {
+  // Check expired bookings every 2 minutes
+  Stream.periodic(const Duration(minutes: 2)).listen((_) async {
+    try {
+      await BookingService.checkAndExpireBookings();
+    } catch (e) {
+      print('Error in periodic booking expiration check: $e');
+    }
+  });
+  
+  // Also check immediately on app start
+  Future.delayed(const Duration(seconds: 5), () async {
+    try {
+      await BookingService.checkAndExpireBookings();
+    } catch (e) {
+      print('Error in initial booking expiration check: $e');
+    }
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -94,7 +119,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.grey[100],
         iconTheme: IconThemeData(color: Colors.teal[700]),
       ),
-      home: const LoginPage(),
+      home: const PermissionSetupPage(),
     );
   }
 }

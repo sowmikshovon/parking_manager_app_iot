@@ -252,7 +252,7 @@ class BookingService {
     return null;
   }
 
-  /// Mark expired bookings
+  /// Mark expired bookings and make spots available again
   static Future<void> markExpiredBookings() async {
     try {
       final now = DateTime.now();
@@ -276,17 +276,33 @@ class BookingService {
         expiredSpotIds.add(booking.spotId);
       }
 
-      // Mark associated spots as expired
+      // Mark associated spots as available again (not expired, but available)
       for (final spotId in expiredSpotIds) {
         batch.update(_spotsCollection.doc(spotId), {
-          'status': SpotStatus.expired.name,
+          'status': SpotStatus.available.name,
+          'isAvailable': true,
+          'currentBookingId': null,
+          'occupiedUntil': null,
           'updatedAt': Timestamp.fromDate(now),
         });
       }
 
       await batch.commit();
+      
+      if (expiredSpotIds.isNotEmpty) {
+        print('BookingService: Marked ${expiredSpotIds.length} expired bookings and made spots available');
+      }
     } catch (e) {
       throw Exception('Failed to mark expired bookings: $e');
+    }
+  }
+
+  /// Check and automatically expire bookings (call this periodically)
+  static Future<void> checkAndExpireBookings() async {
+    try {
+      await markExpiredBookings();
+    } catch (e) {
+      print('Error checking expired bookings: $e');
     }
   }
 

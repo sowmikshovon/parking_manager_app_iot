@@ -269,11 +269,14 @@ class _ProfilePageState extends State<ProfilePage> {
     } on FirebaseException catch (e) {
       print(
           'Firebase Storage Exception during image upload. Code: ${e.code}. Message: ${e.message}. StackTrace: ${e.stackTrace}');
-      String displayError = AppStrings.imageUploadFailed + ': ${e.message ?? "Unknown Firebase error"}';
+      String displayError = AppStrings.imageUploadFailed +
+          ': ${e.message ?? "Unknown Firebase error"}';
       if (e.code == 'object-not-found') {
-        displayError = AppStrings.imageUploadFailed + ': The file was not found after attempting upload. Check permissions or network.';
+        displayError = AppStrings.imageUploadFailed +
+            ': The file was not found after attempting upload. Check permissions or network.';
       } else if (e.code == 'unauthorized' || e.code == 'permission-denied') {
-        displayError = AppStrings.imageUploadFailed + ': Permission denied. Check Firebase Storage rules.';
+        displayError = AppStrings.imageUploadFailed +
+            ': Permission denied. Check Firebase Storage rules.';
       }
       setState(() {
         _error = displayError;
@@ -283,7 +286,8 @@ class _ProfilePageState extends State<ProfilePage> {
       print(
           'Generic Exception during image upload: $e. StackTrace: $stackTrace');
       setState(() {
-        _error = AppStrings.imageUploadFailed + ': An unexpected error occurred. $e';
+        _error =
+            AppStrings.imageUploadFailed + ': An unexpected error occurred. $e';
       });
       return null;
     }
@@ -324,7 +328,9 @@ class _ProfilePageState extends State<ProfilePage> {
           if (mounted) {
             // Check if the widget is still in the tree
             SnackBarUtils.showError(
-                context, _error ?? AppStrings.imageUploadFailed + '. Profile not saved.');
+                context,
+                _error ??
+                    AppStrings.imageUploadFailed + '. Profile not saved.');
           }
           return;
         }
@@ -359,14 +365,16 @@ class _ProfilePageState extends State<ProfilePage> {
           .set(userData, SetOptions(merge: true)); // Use set with merge:true
 
       if (mounted) {
-        SnackBarUtils.showSuccess(context, AppStrings.profileUpdatedSuccessfully);
+        SnackBarUtils.showSuccess(
+            context, AppStrings.profileUpdatedSuccessfully);
       }
     } on FirebaseException catch (e) {
       // Catch Firestore specific errors
       print(
           'Firestore Exception during profile save: ${e.code} - ${e.message}');
       setState(() {
-        _error = AppStrings.failedToSaveProfile + ': ${e.message ?? "Unknown Firebase error"} (Code: ${e.code})';
+        _error = AppStrings.failedToSaveProfile +
+            ': ${e.message ?? "Unknown Firebase error"} (Code: ${e.code})';
       });
     } catch (e) {
       // Catch any other errors

@@ -31,13 +31,14 @@ class _BookSpotPageState extends State<BookSpotPage> {
   CameraPosition?
       _cameraPositionBeforeSelection; // Store camera position before spot selection
   CameraPosition? _currentCameraPosition; // Track current camera position
-
   @override
   void initState() {
     super.initState();
     // Trigger an immediate check when the page loads
     ExpiredSpotTracker.checkAndUpdateExpiredSpots();
-  }  // Method to get user name for display
+  }
+
+  // Method to get user name for display
   Future<String> _getUserName(User user) async {
     final result = await ErrorService.executeWithErrorHandling<String>(
       context,
@@ -69,9 +70,9 @@ class _BookSpotPageState extends State<BookSpotPage> {
     }
     if (user.email != null && user.email!.contains('@')) {
       return user.email!.split('@')[0];
-    }
-    return AppStrings.defaultUserName;
+    }    return AppStrings.defaultUserName;
   }
+
   // Method to book a parking spot
   Future<void> _bookSpot(String spotId, String address) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -90,6 +91,19 @@ class _BookSpotPageState extends State<BookSpotPage> {
     final result = await ErrorService.executeWithErrorHandling<bool>(
       context,
       () async {
+        // Check if user already has an active booking
+        final existingBookings = await FirebaseFirestore.instance
+            .collection('bookings')
+            .where('userId', isEqualTo: user.uid)
+            .where('status', isEqualTo: 'active')
+            .get();
+
+        if (existingBookings.docs.isNotEmpty) {
+          throw Exception(
+            'You already have an active booking. Please complete your current booking before making a new one.\n\nNote: Multiple simultaneous bookings are not supported in this version. This feature may be added in future updates.'
+          );
+        }
+
         // Check if spot is still available
         final spotDoc = await FirebaseFirestore.instance
             .collection('parking_spots')
@@ -162,14 +176,14 @@ class _BookSpotPageState extends State<BookSpotPage> {
         target: LatLng(position.latitude, position.longitude),
         zoom: 14,
       );
-    }
-    // Fallback to default coordinates if location is not available
+    }    // Fallback to default coordinates if location is not available
     return const CameraPosition(
       target: LatLng(23.7624, 90.3785),
       zoom: 14,
     );
-  } // Method to move camera to selected spot
+  }
 
+  // Method to move camera to selected spot
   Future<void> _moveCameraToSpot(LatLng spotLocation) async {
     if (_mapController != null) {
       await _mapController!.animateCamera(
@@ -191,11 +205,12 @@ class _BookSpotPageState extends State<BookSpotPage> {
       );
     }
   }
+
   // Method to move camera to user location
   Future<void> _moveToUserLocation() async {
     if (_mapController == null) {
-      if (mounted) {        SnackBarUtils.showWarning(
-            context, AppStrings.mapNotReady);
+      if (mounted) {
+        SnackBarUtils.showWarning(context, AppStrings.mapNotReady);
       }
       return;
     }

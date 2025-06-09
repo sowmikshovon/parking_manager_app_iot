@@ -29,7 +29,8 @@ class _ListSpotPageState extends State<ListSpotPage> {
       target: LatLng(23.7624, 90.3785),
       zoom: 14,
     );
-  }  // Method to move camera to user location
+  } // Method to move camera to user location
+
   Future<void> _moveToUserLocation() async {
     await ErrorService.executeWithErrorHandling(
       context,
@@ -39,8 +40,7 @@ class _ListSpotPageState extends State<ListSpotPage> {
         } else {
           // print('Map controller is not initialized');
           if (mounted) {
-            SnackBarUtils.showWarning(
-                context, AppStrings.mapNotReady);
+            SnackBarUtils.showWarning(context, AppStrings.mapNotReady);
           }
         }
       },

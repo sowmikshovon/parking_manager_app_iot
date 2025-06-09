@@ -63,6 +63,7 @@ class ErrorHandler {
     // In production, you might want to send errors to a crash reporting service
     // like Firebase Crashlytics, Sentry, etc.
   }
+
   /// Convert Firebase Auth errors to user-friendly messages
   static String getAuthErrorMessage(FirebaseAuthException error) {
     switch (error.code) {
@@ -81,7 +82,8 @@ class ErrorHandler {
       case 'too-many-requests':
         return AuthErrorMessages.tooManyRequests;
       case 'operation-not-allowed':
-        return AuthErrorMessages.operationNotAllowed;      case 'invalid-credential':
+        return AuthErrorMessages.operationNotAllowed;
+      case 'invalid-credential':
         return AuthErrorMessages.invalidCredential;
       case 'network-request-failed':
         return AuthErrorMessages.networkRequestFailed;
@@ -91,6 +93,7 @@ class ErrorHandler {
         return '${AuthErrorMessages.defaultAuthError}: ${error.message ?? 'Unknown error'}';
     }
   }
+
   /// Convert Firestore errors to user-friendly messages
   static String getFirestoreErrorMessage(FirebaseException error) {
     switch (error.code) {
@@ -117,7 +120,8 @@ class ErrorHandler {
       case 'deadline-exceeded':
         return DatabaseErrorMessages.deadlineExceeded;
       case 'unauthenticated':
-        return DatabaseErrorMessages.unauthenticated;      default:
+        return DatabaseErrorMessages.unauthenticated;
+      default:
         return '${DatabaseErrorMessages.defaultDatabaseError}: ${error.message ?? 'Unknown error'}';
     }
   }

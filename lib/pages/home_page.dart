@@ -4,12 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/expired_spot_tracker.dart';
 import '../services/dialog_service.dart';
 import '../services/error_service.dart';
+import '../services/booking_service.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/date_time_utils.dart';
 import '../utils/app_constants.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
-import 'qr_scanner_page.dart';
+import 'qr_scanner_with_bluetooth_page.dart';
 import 'booking_history_page.dart';
 import 'listing_history_page.dart';
 import 'book_spot_page.dart';
@@ -22,7 +23,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {  @override
+class _HomePageState extends State<HomePage> {
+  @override
   void initState() {
     super.initState();
     // Check for expired spots once when page loads
@@ -38,6 +40,18 @@ class _HomePageState extends State<HomePage> {  @override
         await ExpiredSpotTracker.checkAndUpdateExpiredSpots();
       },
       operationName: AppStrings.checkExpiredSpotsOperation,
+      showSnackBar: false, // Silent background operation
+    );
+  }
+
+  // Check and cleanup expired bookings when detected in UI
+  Future<void> _checkExpiredBookings() async {
+    await ErrorService.executeWithErrorHandling<void>(
+      context,
+      () async {
+        await BookingService.checkAndExpireBookings();
+      },
+      operationName: 'Check expired bookings',
       showSnackBar: false, // Silent background operation
     );
   }
@@ -210,7 +224,8 @@ class _HomePageState extends State<HomePage> {  @override
                               size: 14,
                               color: Colors.orange.shade600,
                             ),
-                            const SizedBox(width: 4),                            Text(
+                            const SizedBox(width: 4),
+                            Text(
                               AppStrings.bookedAtPrefix + timeString,
                               style: TextStyle(
                                 fontSize: 12,
@@ -247,13 +262,13 @@ class _HomePageState extends State<HomePage> {  @override
               const SizedBox(height: 16),
               // Action buttons row
               Row(
-                children: [
-                  // QR Scanner button
+                children: [                  // QR Scanner button
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () =>
-                          _openQrScannerForBookedSpot(context, spotId, address),
-                      icon: const Icon(Icons.qr_code_scanner, size: 18),                      label: Text(
+                          _openQrScannerForBookedSpot(context, spotId, address, bookingId),
+                      icon: const Icon(Icons.qr_code_scanner, size: 18),
+                      label: Text(
                         AppStrings.scanQrCodeMenuItem,
                         style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600),
@@ -275,7 +290,8 @@ class _HomePageState extends State<HomePage> {  @override
                     child: ElevatedButton.icon(
                       onPressed: () => _showUnbookingDialog(
                           context, spotId, address, bookingId),
-                      icon: const Icon(Icons.close, size: 18),                      label: Text(
+                      icon: const Icon(Icons.close, size: 18),
+                      label: Text(
                         AppStrings.unbookMenuItem,
                         style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600),
@@ -294,14 +310,16 @@ class _HomePageState extends State<HomePage> {  @override
                   const SizedBox(width: 8), // More button (work in progress)
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {                        SnackBarUtils.showCustom(
+                      onPressed: () {
+                        SnackBarUtils.showCustom(
                           context,
                           AppStrings.workInProgress,
                           backgroundColor: Colors.blueGrey[700],
                           icon: Icons.construction,
                         );
                       },
-                      icon: const Icon(Icons.navigation, size: 18),                      label: Text(
+                      icon: const Icon(Icons.navigation, size: 18),
+                      label: Text(
                         AppStrings.navigateMenuItem,
                         style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600),
@@ -325,21 +343,14 @@ class _HomePageState extends State<HomePage> {  @override
       ),
     );
   }
-
   // Method to open QR scanner for booked spots
   void _openQrScannerForBookedSpot(
-      BuildContext context, String spotId, String address) {
+      BuildContext context, String spotId, String address, String bookingId) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => QrScannerPage(
-          expectedSpotId: spotId,
+        builder: (context) => QrScannerWithBluetoothPage(
+          bookingId: bookingId,
           address: address,
-          onSuccess: () {            SnackBarUtils.showSuccess(
-                context, AppStrings.qrCodeVerifiedSuccessfully);
-          },
-          onSkip: () {
-            SnackBarUtils.showWarning(context, AppStrings.qrScanningSkipped);
-          },
         ),
       ),
     );
@@ -360,6 +371,7 @@ class _HomePageState extends State<HomePage> {  @override
       await _unbookSpot(context, spotId, bookingId);
     }
   }
+
   Future<void> _unbookSpot(
     BuildContext context,
     String spotId,
@@ -371,7 +383,8 @@ class _HomePageState extends State<HomePage> {  @override
         // Update the parking spot to be available
         await FirebaseFirestore.instance
             .collection('parking_spots')
-            .doc(spotId)            .update({'isAvailable': true});
+            .doc(spotId)
+            .update({'isAvailable': true});
 
         // Update the booking status to completed
         await FirebaseFirestore.instance
@@ -389,7 +402,8 @@ class _HomePageState extends State<HomePage> {  @override
     );
 
     if (result != null && result == true) {
-      if (context.mounted) {        SnackBarUtils.showSuccess(
+      if (context.mounted) {
+        SnackBarUtils.showSuccess(
             context, AppStrings.parkingSpotSuccessfullyUnbooked);
       }
     } else {
@@ -401,7 +415,8 @@ class _HomePageState extends State<HomePage> {  @override
           await FirebaseFirestore.instance
               .collection('bookings')
               .doc(bookingId)
-              .update({            'status': AppStrings.spotDeletedStatus,
+              .update({
+            'status': AppStrings.spotDeletedStatus,
             'endTime': Timestamp.now(),
             'note': AppStrings.parkingSpotNoLongerAvailable,
           });
@@ -412,7 +427,8 @@ class _HomePageState extends State<HomePage> {  @override
       );
 
       if (fallbackResult != null && fallbackResult == true) {
-        if (context.mounted) {          SnackBarUtils.showWarning(
+        if (context.mounted) {
+          SnackBarUtils.showWarning(
               context, AppStrings.bookingEndedSpotUnavailable);
         }
       }
@@ -423,7 +439,8 @@ class _HomePageState extends State<HomePage> {  @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return Scaffold(        appBar: AppBar(title: Text(AppStrings.appTitle)),
+      return Scaffold(
+        appBar: AppBar(title: Text(AppStrings.appTitle)),
         body: Center(
           child: Text(AppStrings.pleaseLogInToAccess),
         ),
@@ -483,7 +500,8 @@ class _HomePageState extends State<HomePage> {  @override
                       size: 35,
                     ),
                   ),
-                  const SizedBox(height: 10),                  Text(
+                  const SizedBox(height: 10),
+                  Text(
                     AppStrings.parkingManagerTitle,
                     style: TextStyle(color: Colors.white, fontSize: 20),
                   ),
@@ -589,7 +607,8 @@ class _HomePageState extends State<HomePage> {  @override
               children: [
                 FutureBuilder<String>(
                   future: _getUserName(user),
-                  builder: (context, snapshot) {                    String name = snapshot.data ?? AppStrings.defaultUserName;
+                  builder: (context, snapshot) {
+                    String name = snapshot.data ?? AppStrings.defaultUserName;
                     return Text(
                       '${AppStrings.welcomeUser}$name!',
                       style: TextStyle(
@@ -600,7 +619,8 @@ class _HomePageState extends State<HomePage> {  @override
                     );
                   },
                 ),
-                const SizedBox(height: 8),                Text(
+                const SizedBox(height: 8),
+                Text(
                   AppStrings.manageParkingMessage,
                   style: TextStyle(
                     fontSize: 16,
@@ -641,15 +661,28 @@ class _HomePageState extends State<HomePage> {  @override
                             final spotData = spotSnapshot.data!.data()
                                 as Map<String, dynamic>;
                             final availableUntilTimestamp =
-                                spotData['availableUntil'] as Timestamp?;
-
-                            if (availableUntilTimestamp != null) {
+                                spotData['availableUntil'] as Timestamp?;                            if (availableUntilTimestamp != null) {
                               final availableUntil =
                                   availableUntilTimestamp.toDate();
                               final now = DateTime.now();
-                              final remaining = availableUntil.difference(now);                              remainingText = remaining.isNegative
-                                  ? AppStrings.expired
-                                  : '${remaining.inHours}${AppStrings.hoursMinutesRemaining}${remaining.inMinutes % 60}${AppStrings.minutesRemaining}';
+                              final remaining = availableUntil.difference(now);
+                              
+                              if (remaining.isNegative) {
+                                remainingText = AppStrings.expired;
+                                // Trigger expiration check when we detect expired booking
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  _checkExpiredBookings();
+                                });
+                              } else {
+                                final hours = remaining.inHours;
+                                final minutes = remaining.inMinutes % 60;
+                                remainingText = '${hours}h ${minutes}m remaining';
+                                
+                                // Show warning if less than 30 minutes remaining
+                                if (remaining.inMinutes <= 30 && remaining.inMinutes > 0) {
+                                  remainingText = '⚠️ $remainingText (expiring soon!)';
+                                }
+                              }
                             } else {
                               remainingText = AppStrings.noTimeLimit;
                             }
@@ -658,7 +691,8 @@ class _HomePageState extends State<HomePage> {  @override
                           }
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [                              Text(
+                            children: [
+                              Text(
                                 AppStrings.currentBooking,
                                 style: TextStyle(
                                   fontSize: 18,
@@ -692,7 +726,8 @@ class _HomePageState extends State<HomePage> {  @override
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [                  Text(
+                children: [
+                  Text(
                     AppStrings.quickActions,
                     style: TextStyle(
                       fontSize: 20,
@@ -761,6 +796,7 @@ class _HomePageState extends State<HomePage> {  @override
       ),
     );
   }
+
   // Helper method to get user name for display
   Future<String> _getUserName(User user) async {
     final result = await ErrorService.executeWithErrorHandling<String>(
