@@ -288,9 +288,10 @@ class BookingService {
       }
 
       await batch.commit();
-      
+
       if (expiredSpotIds.isNotEmpty) {
-        print('BookingService: Marked ${expiredSpotIds.length} expired bookings and made spots available');
+        print(
+            'BookingService: Marked ${expiredSpotIds.length} expired bookings and made spots available');
       }
     } catch (e) {
       throw Exception('Failed to mark expired bookings: $e');

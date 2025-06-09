@@ -7,7 +7,8 @@ class BluetoothValidationWidget extends StatefulWidget {
   const BluetoothValidationWidget({Key? key}) : super(key: key);
 
   @override
-  State<BluetoothValidationWidget> createState() => _BluetoothValidationWidgetState();
+  State<BluetoothValidationWidget> createState() =>
+      _BluetoothValidationWidgetState();
 }
 
 class _BluetoothValidationWidgetState extends State<BluetoothValidationWidget> {
@@ -28,58 +29,64 @@ class _BluetoothValidationWidgetState extends State<BluetoothValidationWidget> {
       // Test 1: Bluetooth Availability
       results.writeln('\n📡 Test 1: Bluetooth Availability');
       bool? isEnabled = await FlutterBluetoothSerial.instance.isEnabled;
-      results.writeln(isEnabled == true 
-          ? '✅ Bluetooth is enabled' 
+      results.writeln(isEnabled == true
+          ? '✅ Bluetooth is enabled'
           : '❌ Bluetooth is disabled');
 
       // Test 2: Permissions
       results.writeln('\n🔐 Test 2: Permission Check');
-      final permissionResult = await BluetoothService.requestPermissionsWithSetup();
-      results.writeln(permissionResult.hasPermissions 
-          ? '✅ Permissions granted' 
+      final permissionResult =
+          await BluetoothService.requestPermissionsWithSetup();
+      results.writeln(permissionResult.hasPermissions
+          ? '✅ Permissions granted'
           : '❌ Permissions missing: ${permissionResult.message}');
 
       // Test 3: Device Discovery
       results.writeln('\n📱 Test 3: Device Discovery');
       List<BluetoothDevice> devices = await BluetoothService.getPairedDevices();
       results.writeln('✅ Found ${devices.length} paired devices');
-      
+
       if (devices.isNotEmpty) {
         results.writeln('   📋 Device List:');
         for (var device in devices) {
-          results.writeln('   - ${device.name ?? 'Unknown'} (${device.address})');
+          results
+              .writeln('   - ${device.name ?? 'Unknown'} (${device.address})');
         }
 
         // Test 4: Enhanced Connection Logic (if devices available)
         results.writeln('\n🔗 Test 4: Enhanced Connection Logic');
         final testDevice = devices.first;
         results.writeln('   Testing with: ${testDevice.name ?? 'Unknown'}');
-        
-        bool connectionResult = await BluetoothService.connectToDevice(testDevice);
-        results.writeln(connectionResult 
-            ? '✅ Enhanced connection logic succeeded' 
+
+        bool connectionResult =
+            await BluetoothService.connectToDevice(testDevice);
+        results.writeln(connectionResult
+            ? '✅ Enhanced connection logic succeeded'
             : '⚠️ Connection attempt completed (check console for details)');
-        
+
         if (connectionResult) {
           // Test 5: Message Sending
           results.writeln('\n📤 Test 5: Message Sending');
-          bool sendResult = await BluetoothService.sendMessageWithLogging('TEST');
-          results.writeln(sendResult 
-              ? '✅ Message sending works' 
+          bool sendResult =
+              await BluetoothService.sendMessageWithLogging('TEST');
+          results.writeln(sendResult
+              ? '✅ Message sending works'
               : '⚠️ Message sending test completed');
-          
+
           // Disconnect after test
           await BluetoothService.disconnect();
           results.writeln('🔌 Disconnected from test device');
         }
       } else {
         results.writeln('⚠️ No devices available for connection testing');
-        results.writeln('   💡 Pair a Bluetooth device to test connection features');
+        results.writeln(
+            '   💡 Pair a Bluetooth device to test connection features');
       }
 
       // Test 6: Diagnostics
       results.writeln('\n🔍 Test 6: Diagnostic System');
-      Map<String, dynamic> diagnosis = await BluetoothService.diagnoseBluetooth();
+      Map<String, dynamic> diagnosis =
+          await BluetoothService.diagnoseBluetooth();
       results.writeln('✅ Diagnostics completed:');
       results.writeln('   - Bluetooth: ${diagnosis['bluetoothEnabled']}');
       results.writeln('   - Devices: ${diagnosis['pairedDevicesCount']}');
@@ -90,7 +97,6 @@ class _BluetoothValidationWidgetState extends State<BluetoothValidationWidget> {
       results.writeln('================================');
       results.writeln('✅ Enhanced Bluetooth system is functional');
       results.writeln('💡 Check console for detailed connection logs');
-
     } catch (e) {
       results.writeln('\n❌ Validation Error: $e');
     }
@@ -162,7 +168,8 @@ class _BluetoothValidationWidgetState extends State<BluetoothValidationWidget> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         ),
                         SizedBox(width: 8),
@@ -190,8 +197,8 @@ class _BluetoothValidationWidgetState extends State<BluetoothValidationWidget> {
                       Expanded(
                         child: SingleChildScrollView(
                           child: Text(
-                            _testResults.isEmpty 
-                                ? 'Click "Run Validation Tests" to begin...' 
+                            _testResults.isEmpty
+                                ? 'Click "Run Validation Tests" to begin...'
                                 : _testResults,
                             style: const TextStyle(
                               fontFamily: 'monospace',

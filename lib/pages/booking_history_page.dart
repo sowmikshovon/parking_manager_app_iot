@@ -76,7 +76,8 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
         if (context.mounted) {
           SnackBarUtils.showSuccess(
               context, AppStrings.parkingEndedSuccessfully);
-        }      },
+        }
+      },
       operationName: AppStrings.endParkingOperation,
     );
   }
@@ -117,7 +118,8 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
           }
 
           return ListView.builder(
-            itemCount: bookings.length,            itemBuilder: (context, index) {
+            itemCount: bookings.length,
+            itemBuilder: (context, index) {
               final booking = bookings[index];
               final data = booking.data() as Map<String, dynamic>;
               final address = data['address'] as String? ?? 'No address';
@@ -126,7 +128,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
               final startTime = data['startTime'] as Timestamp?;
               final endTime = data['endTime'] as Timestamp?;
               final bookingId = booking.id;
-              
+
               // Check if booking has actually expired (for active bookings)
               bool actuallyExpired = false;
               if (status == 'active') {
@@ -139,16 +141,17 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                   // This will be handled in a FutureBuilder below
                 }
               }
-              
+
               final String displayStatus = actuallyExpired ? 'expired' : status;
               final bool isActive = displayStatus == 'active';
-              
+
               final String startTimeString = startTime != null
                   ? DateTimeUtils.formatDateTime(context, startTime.toDate())
                   : AppStrings.unknown;
               final String endTimeString = endTime != null
                   ? DateTimeUtils.formatDateTime(context, endTime.toDate())
-                  : AppStrings.ongoing;              return Card(
+                  : AppStrings.ongoing;
+              return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -175,23 +178,29 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                                   .get(),
                               builder: (context, spotSnapshot) {
                                 String finalStatus = displayStatus;
-                                
-                                if (spotSnapshot.hasData && spotSnapshot.data!.exists) {
-                                  final spotData = spotSnapshot.data!.data() as Map<String, dynamic>;
-                                  final availableUntilTimestamp = spotData['availableUntil'] as Timestamp?;
-                                  
+
+                                if (spotSnapshot.hasData &&
+                                    spotSnapshot.data!.exists) {
+                                  final spotData = spotSnapshot.data!.data()
+                                      as Map<String, dynamic>;
+                                  final availableUntilTimestamp =
+                                      spotData['availableUntil'] as Timestamp?;
+
                                   if (availableUntilTimestamp != null) {
-                                    final availableUntil = availableUntilTimestamp.toDate();
-                                    if (availableUntil.isBefore(DateTime.now())) {
+                                    final availableUntil =
+                                        availableUntilTimestamp.toDate();
+                                    if (availableUntil
+                                        .isBefore(DateTime.now())) {
                                       finalStatus = 'expired';
                                       // Trigger expiration check for this booking
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
                                         _checkExpiredBookings();
                                       });
                                     }
                                   }
                                 }
-                                
+
                                 return StatusChip(status: finalStatus);
                               },
                             )
@@ -226,7 +235,8 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                             ),
                           ],
                         ),
-                      ],                      if (isActive && !actuallyExpired) ...[
+                      ],
+                      if (isActive && !actuallyExpired) ...[
                         const SizedBox(height: 16),
                         // Check if booking is still actually active (not expired)
                         FutureBuilder<DocumentSnapshot>(
@@ -236,21 +246,26 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                               .get(),
                           builder: (context, spotSnapshot) {
                             bool shouldShowActions = true;
-                            
-                            if (spotSnapshot.hasData && spotSnapshot.data!.exists) {
-                              final spotData = spotSnapshot.data!.data() as Map<String, dynamic>;
-                              final availableUntilTimestamp = spotData['availableUntil'] as Timestamp?;
-                              
+
+                            if (spotSnapshot.hasData &&
+                                spotSnapshot.data!.exists) {
+                              final spotData = spotSnapshot.data!.data()
+                                  as Map<String, dynamic>;
+                              final availableUntilTimestamp =
+                                  spotData['availableUntil'] as Timestamp?;
+
                               if (availableUntilTimestamp != null) {
-                                final availableUntil = availableUntilTimestamp.toDate();
-                                shouldShowActions = availableUntil.isAfter(DateTime.now());
+                                final availableUntil =
+                                    availableUntilTimestamp.toDate();
+                                shouldShowActions =
+                                    availableUntil.isAfter(DateTime.now());
                               }
                             }
-                            
+
                             if (!shouldShowActions) {
                               return const SizedBox.shrink();
                             }
-                            
+
                             return Row(
                               children: [
                                 Expanded(
@@ -258,8 +273,8 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                                     label: AppStrings.scanLabel,
                                     icon: Icons.qr_code_scanner,
                                     onPressed: () =>
-                                        _openQrScannerForBookingHistory(
-                                            context, spotId, address, bookingId),
+                                        _openQrScannerForBookingHistory(context,
+                                            spotId, address, bookingId),
                                     backgroundColor: Colors.teal.shade600,
                                   ),
                                 ),

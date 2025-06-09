@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,30 +6,37 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 
 import '../services/bluetooth_service.dart';
+import '../services/parking_session_service.dart';
+import '../utils/snackbar_utils.dart';
+import 'home_page.dart';
 
 class QrScannerWithBluetoothPage extends StatefulWidget {
   final String bookingId;
   final String address;
-  
+
   const QrScannerWithBluetoothPage({
-    super.key, 
+    super.key,
     required this.bookingId,
     required this.address,
   });
 
   @override
-  State<QrScannerWithBluetoothPage> createState() => _QrScannerWithBluetoothPageState();
+  State<QrScannerWithBluetoothPage> createState() =>
+      _QrScannerWithBluetoothPageState();
 }
 
-class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage> {
+class _QrScannerWithBluetoothPageState
+    extends State<QrScannerWithBluetoothPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   MobileScannerController cameraController = MobileScannerController();
   bool _isProcessing = false;
   bool _isFlashOn = false;
-
+  bool _scannerPaused = false;
+  StreamSubscription<String>? _bluetoothSubscription;
   @override
   void dispose() {
     cameraController.dispose();
+    _bluetoothSubscription?.cancel();
     BluetoothService.disconnect();
     super.dispose();
   }
@@ -39,7 +47,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
       appBar: AppBar(
         title: const Text('Scan QR Code'),
         backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,        actions: [
+        foregroundColor: Colors.white,
+        actions: [
           IconButton(
             icon: Icon(
               _isFlashOn ? Icons.flash_on : Icons.flash_off,
@@ -51,11 +60,6 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
                 _isFlashOn = !_isFlashOn;
               });
             },
-          ),          // Test button for Bluetooth HC05 communication
-          IconButton(
-            icon: const Icon(Icons.bluetooth_searching, color: Colors.lightBlue),
-            tooltip: 'Test Bluetooth HC05 (Gate Close)',
-            onPressed: _testBluetoothConnection,
           ),
         ],
       ),
@@ -101,7 +105,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
@@ -110,7 +115,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.bluetooth, size: 16, color: Colors.blue.shade700),
+                            Icon(Icons.bluetooth,
+                                size: 16, color: Colors.blue.shade700),
                             const SizedBox(width: 4),
                             Text(
                               'IoT Gate Control Enabled',
@@ -163,9 +169,31 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
                           const CircularProgressIndicator(color: Colors.white),
                           const SizedBox(height: 16),
                           Text(
-                            'Processing QR code and connecting to gate...',
+                            _scannerPaused
+                                ? 'Waiting for gate response...'
+                                : 'Processing QR code and connecting to gate...',
                             style: TextStyle(
                               color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      )
+                    else if (_scannerPaused)
+                      Column(
+                        children: [
+                          Icon(
+                            Icons.pause_circle_outline,
+                            color: Colors.orange.shade300,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Scanner paused. Listening for IoT response...',
+                            style: TextStyle(
+                              color: Colors.orange.shade200,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -194,12 +222,14 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
   }
 
   void _onQRViewCreated(BarcodeCapture capture) {
-    if (_isProcessing) return;
+    if (_isProcessing || _scannerPaused) return;
 
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
       final String? qrData = barcode.rawValue;
       if (qrData != null) {
+        // Pause scanner after QR detection
+        setState(() => _scannerPaused = true);
         _processQrCode(qrData);
         break;
       }
@@ -208,20 +238,22 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
 
   Future<void> _processQrCode(String qrData) async {
     if (_isProcessing) return;
-    
+
     setState(() => _isProcessing = true);
-    
+
     try {
       // Step 1: Validate QR code and booking
       final isValid = await _validateBookingAndQr(qrData);
-      
+
       if (isValid) {
         // Step 2: Send Bluetooth command to IoT device
         await _sendBluetoothCommand();
       } else {
+        _resumeScanner(); // Resume scanner for invalid QR
         _showErrorDialog('Invalid QR code or booking not found');
       }
     } catch (e) {
+      _resumeScanner(); // Resume scanner on error
       _showErrorDialog('Error processing QR code: $e');
     } finally {
       if (mounted) {
@@ -245,15 +277,19 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
 
       final bookingData = bookingDoc.data()!;
       final spotId = bookingData['spotId'];
-      final bookingUserId = bookingData['userId'];
-      
-      // Verify QR code matches the spot and user owns the booking
+      final bookingUserId = bookingData[
+          'userId']; // Verify QR code matches the spot and user owns the booking
       return qrData == spotId && bookingUserId == user.uid;
     } catch (e) {
-      print('Validation error: $e');
+      // Remove print statement for production - use proper logging instead
       return false;
     }
-  }  Future<void> _sendBluetoothCommand() async {
+  }
+
+  Future<void> _sendBluetoothCommand() async {
+    // Store context before async operations
+    final navigator = Navigator.of(context);
+
     try {
       // Check if we have a connected device already
       if (BluetoothService.isConnected) {
@@ -266,10 +302,10 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
 
       // Use the enhanced permission system with comprehensive setup
       final result = await BluetoothService.requestPermissionsWithSetup();
-      
+
       if (!result.hasPermissions) {
-        Navigator.of(context).pop(); // Close processing dialog
-        
+        navigator.pop(); // Close processing dialog
+
         if (result.shouldOpenSettings) {
           await _showBluetoothSetupDialog(result);
         } else {
@@ -279,7 +315,7 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
       }
 
       if (result.shouldOpenSettings) {
-        Navigator.of(context).pop(); // Close processing dialog
+        navigator.pop(); // Close processing dialog
         await _showPairingGuidanceDialog();
         return;
       }
@@ -287,21 +323,22 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
       // Get paired devices and find HC05
       final pairedDevices = await BluetoothService.getPairedDevices();
       final hc05Devices = await BluetoothService.findHC05Devices();
-      
+
       BluetoothDevice? targetDevice;
-      
+
       if (hc05Devices.isNotEmpty) {
         // Prefer HC05 devices
         targetDevice = hc05Devices.first;
-        Navigator.of(context).pop(); // Close processing dialog
-        _showProcessingDialog('Connecting to HC05 module: ${targetDevice.name}...');
+        navigator.pop(); // Close processing dialog
+        _showProcessingDialog(
+            'Connecting to HC05 module: ${targetDevice.name}...');
       } else if (pairedDevices.isNotEmpty) {
         // Use first available paired device
         targetDevice = pairedDevices.first;
-        Navigator.of(context).pop(); // Close processing dialog
+        navigator.pop(); // Close processing dialog
         _showProcessingDialog('Connecting to device: ${targetDevice.name}...');
       } else {
-        Navigator.of(context).pop(); // Close processing dialog
+        navigator.pop(); // Close processing dialog
         await _showPairingGuidanceDialog();
         return;
       }
@@ -309,72 +346,152 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
       // Connect to device
       final connected = await BluetoothService.connectToDevice(targetDevice);
       if (!connected) {
-        Navigator.of(context).pop(); // Close processing dialog
-        _showErrorDialog('Failed to connect to ${targetDevice.name}. Please ensure the device is powered on and in range.');
+        navigator.pop(); // Close processing dialog
+        _showErrorDialog(
+            'Failed to connect to ${targetDevice.name}. Please ensure the device is powered on and in range.');
         return;
       }
 
       // Send the command
       await _sendCommandToConnectedDevice();
-
     } catch (e) {
       if (mounted) {
-        Navigator.of(context).popUntil((route) => route is! DialogRoute); // Close any dialogs
+        navigator
+            .popUntil((route) => route is! DialogRoute); // Close any dialogs
         _showErrorDialog('Bluetooth error: $e');
       }
     }
   }
 
   Future<void> _sendCommandToConnectedDevice() async {
+    // Store context before async operations
+    final navigator = Navigator.of(context);
+
     try {
       // Update dialog
-      Navigator.of(context).pop(); // Close any existing dialog
+      navigator.pop(); // Close any existing dialog
       _showProcessingDialog('Sending gate control command...');
+
+      // Cancel any existing subscription before creating a new one
+      await _bluetoothSubscription?.cancel();
 
       // Send HC05 compatible command
       final messageSent = await BluetoothService.sendMessage('OPEN_GATE\n');
       if (!messageSent) {
-        Navigator.of(context).pop(); // Close processing dialog
+        navigator.pop(); // Close processing dialog
+        _resumeScanner(); // Resume scanner on failure
         _showErrorDialog('Failed to send command to IoT device');
         return;
       }
 
       // Listen for response with timeout
       bool responseReceived = false;
-      String? receivedResponse;
-      
-      BluetoothService.listenForMessages().listen((response) {
+      String? receivedResponse; // Create new subscription
+      _bluetoothSubscription =
+          BluetoothService.listenForMessages().listen((response) {
         receivedResponse = response.trim().toUpperCase();
-        if ((receivedResponse == 'GATE_OPENED' || 
-             receivedResponse == 'OK' || 
-             receivedResponse == 'SUCCESS') && !responseReceived) {
+
+        // Track gate command in parking session
+        ParkingSessionService.trackGateCommand(
+            widget.bookingId, receivedResponse!);
+
+        // Listen for both "Gate Opened" and "Gate Closed" responses
+        if (receivedResponse == 'GATE OPENED' && !responseReceived) {
           responseReceived = true;
-          Navigator.of(context).pop(); // Close processing dialog
-          _showSuccessDialog(receivedResponse!);
+          navigator.pop(); // Close processing dialog
+          _navigateToHomeWithSuccess();
+        } else if (receivedResponse == 'GATE CLOSED' && !responseReceived) {
+          responseReceived = true;
+          navigator.pop(); // Close processing dialog
+          _navigateToHomeWithClosedMessage();
         }
       });
 
       // Set timeout for response
       Future.delayed(const Duration(seconds: 15), () {
         if (!responseReceived && mounted) {
-          Navigator.of(context).pop(); // Close processing dialog
-          
+          navigator.pop(); // Close processing dialog
+
           if (receivedResponse != null) {
             // We got some response but not the expected one
-            _showSuccessDialog('Command sent successfully. Response: $receivedResponse');
+            _resumeScanner(); // Resume scanner
+            _showErrorDialog(
+                'Unexpected response: $receivedResponse. Please try again.');
           } else {
             // No response received, but command was sent
+            _resumeScanner(); // Resume scanner
             _showPartialSuccessDialog();
           }
         }
       });
-
     } catch (e) {
       if (mounted) {
-        Navigator.of(context).popUntil((route) => route is! DialogRoute);
+        navigator.popUntil((route) => route is! DialogRoute);
+        _resumeScanner(); // Resume scanner on error
         _showErrorDialog('Error sending command: $e');
       }
     }
+  }
+
+  // Resume scanner after error or timeout
+  void _resumeScanner() {
+    if (mounted) {
+      setState(() => _scannerPaused = false);
+      // Cancel any active Bluetooth subscription when resuming scanner
+      _bluetoothSubscription?.cancel();
+      _bluetoothSubscription = null;
+    }
+  } // Navigate to home page with success snackbar
+
+  void _navigateToHomeWithSuccess() {
+    if (!mounted) return;
+
+    // Store navigator and context references before async operations
+    final navigator = Navigator.of(context);
+    final currentContext = context;
+
+    // Clean up subscription before navigation
+    _bluetoothSubscription?.cancel();
+    _bluetoothSubscription = null;
+
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const HomePage()),
+      (route) => false,
+    );
+
+    // Show success snackbar on home page
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        SnackBarUtils.showSuccess(currentContext,
+            'Gate Opened Successfully! QR code verified for: ${widget.address}');
+      }
+    });
+  }
+
+  // Navigate to home page with gate closed snackbar
+  void _navigateToHomeWithClosedMessage() {
+    if (!mounted) return;
+
+    // Store navigator and context references before async operations
+    final navigator = Navigator.of(context);
+    final currentContext = context;
+
+    // Clean up subscription before navigation
+    _bluetoothSubscription?.cancel();
+    _bluetoothSubscription = null;
+
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const HomePage()),
+      (route) => false,
+    );
+
+    // Show gate closed snackbar on home page
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        SnackBarUtils.showInfo(
+            currentContext, 'Gate Closed: ${widget.address} is now secured');
+      }
+    });
   }
 
   void _showProcessingDialog(String message) {
@@ -393,77 +510,6 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
       ),
     );
   }
-  void _showSuccessDialog([String? message]) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
-        title: const Text('Gate Opened Successfully!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('QR code verified for:\n${widget.address}'),
-            const SizedBox(height: 8),
-            if (message != null) ...[
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Text(
-                  'Response: $message',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue.shade700,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lock_open, color: Colors.green.shade700),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Gate opened via IoT command',
-                    style: TextStyle(
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Close scanner
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showErrorDialog(String message) {
     showDialog(
@@ -479,6 +525,7 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
               setState(() {
                 _isProcessing = false;
               });
+              _resumeScanner(); // Resume scanner when user dismisses error
             },
             child: const Text('Try Again'),
           ),
@@ -487,15 +534,16 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
     );
   }
 
-  Future<void> _showBluetoothSetupDialog(BluetoothPermissionResult result) async {
+  Future<void> _showBluetoothSetupDialog(
+      BluetoothPermissionResult result) async {
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: Icon(
-          result.settingsType == BluetoothSettingsType.appSettings 
-            ? Icons.settings 
-            : Icons.bluetooth_disabled,
+          result.settingsType == BluetoothSettingsType.appSettings
+              ? Icons.settings
+              : Icons.bluetooth_disabled,
           color: Colors.orange,
           size: 48,
         ),
@@ -532,8 +580,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
                   const SizedBox(height: 8),
                   Text(
                     result.settingsType == BluetoothSettingsType.appSettings
-                      ? '1. Open app settings\n2. Enable Bluetooth permissions\n3. Return to the app'
-                      : '1. Enable Bluetooth\n2. Pair with HC05 module\n3. Return to scan again',
+                        ? '1. Open app settings\n2. Enable Bluetooth permissions\n3. Return to the app'
+                        : '1. Enable Bluetooth\n2. Pair with HC05 module\n3. Return to scan again',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.blue.shade600,
@@ -558,7 +606,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
             onPressed: () async {
               Navigator.of(context).pop();
               if (result.settingsType != null) {
-                await BluetoothService.openBluetoothSettings(result.settingsType!);
+                await BluetoothService.openBluetoothSettings(
+                    result.settingsType!);
               }
               Navigator.of(context).pop(); // Return to previous screen
             },
@@ -577,7 +626,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.bluetooth_searching, color: Colors.blue, size: 48),
+        icon:
+            const Icon(Icons.bluetooth_searching, color: Colors.blue, size: 48),
         title: const Text('Pair with HC05 Module'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -624,7 +674,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
             const SizedBox(height: 16),
             Row(
               children: [
-                Icon(Icons.lightbulb_outline, color: Colors.amber.shade700, size: 20),
+                Icon(Icons.lightbulb_outline,
+                    color: Colors.amber.shade700, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -653,7 +704,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
             label: const Text('Open Bluetooth'),
             onPressed: () async {
               Navigator.of(context).pop();
-              await BluetoothService.openBluetoothSettings(BluetoothSettingsType.bluetoothPairing);
+              await BluetoothService.openBluetoothSettings(
+                  BluetoothSettingsType.bluetoothPairing);
               Navigator.of(context).pop(); // Return to previous screen
             },
             style: ElevatedButton.styleFrom(
@@ -687,7 +739,8 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.bluetooth_connected, color: Colors.orange.shade700),
+                  Icon(Icons.bluetooth_connected,
+                      color: Colors.orange.shade700),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -707,145 +760,16 @@ class _QrScannerWithBluetoothPageState extends State<QrScannerWithBluetoothPage>
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Close scanner
+              _resumeScanner(); // Resume scanner
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Continue'),
+            child: const Text('Continue Scanning'),
           ),
-        ],      ),
+        ],
+      ),
     );
-  }  // Test method to quickly test Bluetooth HC05 communication (gate_close command)
-  Future<void> _testBluetoothConnection() async {
-    try {
-      // Show processing dialog
-      _showProcessingDialog('Testing Bluetooth connection...');
-
-      // Check Bluetooth permissions
-      final permissionResult = await BluetoothService.requestPermissionsWithSetup();
-      if (!permissionResult.hasPermissions) {
-        Navigator.of(context).pop(); // Close processing dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Bluetooth permissions required: ${permissionResult.message}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
-
-      // Get paired devices and find HC05
-      final pairedDevices = await BluetoothService.getPairedDevices();
-      final hc05Devices = await BluetoothService.findHC05Devices();
-      
-      BluetoothDevice? targetDevice;
-      
-      if (hc05Devices.isNotEmpty) {
-        // Prefer HC05 devices
-        targetDevice = hc05Devices.first;
-      } else if (pairedDevices.isNotEmpty) {
-        // Use first available paired device
-        targetDevice = pairedDevices.first;
-      } else {
-        Navigator.of(context).pop(); // Close processing dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No paired Bluetooth devices found. Please pair with HC05 first.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
-
-      // Connect to HC05
-      final connected = await BluetoothService.connectToDevice(targetDevice);
-      if (!connected) {
-        Navigator.of(context).pop(); // Close processing dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to connect to ${targetDevice.name}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        return;
-      }      // Send test command
-      final messageSent = await BluetoothService.sendMessage('gate_close\n');
-      if (!messageSent) {
-        Navigator.of(context).pop(); // Close processing dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send test command'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
-
-      // Listen for response with timeout
-      bool responseReceived = false;
-      String? receivedResponse;
-      
-      BluetoothService.listenForMessages().listen((response) {
-        receivedResponse = response.trim();
-        if (!responseReceived) {
-          responseReceived = true;
-          Navigator.of(context).pop(); // Close processing dialog
-          
-          // Show response in snackbar
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ Response received: $receivedResponse'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      });
-
-      // Set timeout for response
-      Future.delayed(const Duration(seconds: 10), () {
-        if (!responseReceived && mounted) {
-          Navigator.of(context).pop(); // Close processing dialog
-          
-          if (receivedResponse != null && receivedResponse!.isNotEmpty) {
-            // We got some response
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('⚠️ Unexpected response: $receivedResponse'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          } else {
-            // No response received, but command was sent
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('📤 Command sent, but no response received'),
-                backgroundColor: Colors.blue,
-                duration: Duration(seconds: 4),
-              ),
-            );
-          }
-        }
-      });
-
-    } catch (e) {
-      if (mounted) {
-        Navigator.of(context).popUntil((route) => route is! DialogRoute);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Test failed: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }
   }
 }

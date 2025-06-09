@@ -227,7 +227,8 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                         color: Theme.of(context).colorScheme.error,
                         fontSize: 12),
                   ),
-                ),              const SizedBox(height: 30),
+                ),
+              const SizedBox(height: 30),
               ElevatedButton.icon(
                 icon: _isLoading
                     ? const SizedBox(
@@ -238,10 +239,13 @@ class _AddressEntryPageState extends State<AddressEntryPage> {
                     : const Icon(Icons.check_circle_outline),
                 label:
                     Text(_isLoading ? 'LISTING...' : 'CONFIRM AND LIST SPOT'),
-                onPressed: _isLoading ? null : _submitSpot,                style: ElevatedButton.styleFrom(
+                onPressed: _isLoading ? null : _submitSpot,
+                style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   textStyle: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),                ),              ),
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
               const SizedBox(height: 16),
             ],
           ),

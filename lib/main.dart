@@ -12,7 +12,7 @@ void main() async {
 
   // Start global expired spot tracking
   ExpiredSpotTracker.startGlobalTracking();
-  
+
   // Start periodic booking expiration checking
   _startBookingExpirationChecking();
 
@@ -29,7 +29,7 @@ void _startBookingExpirationChecking() {
       print('Error in periodic booking expiration check: $e');
     }
   });
-  
+
   // Also check immediately on app start
   Future.delayed(const Duration(seconds: 5), () async {
     try {

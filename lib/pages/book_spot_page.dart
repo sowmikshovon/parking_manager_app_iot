@@ -70,7 +70,8 @@ class _BookSpotPageState extends State<BookSpotPage> {
     }
     if (user.email != null && user.email!.contains('@')) {
       return user.email!.split('@')[0];
-    }    return AppStrings.defaultUserName;
+    }
+    return AppStrings.defaultUserName;
   }
 
   // Method to book a parking spot
@@ -100,8 +101,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
 
         if (existingBookings.docs.isNotEmpty) {
           throw Exception(
-            'You already have an active booking. Please complete your current booking before making a new one.\n\nNote: Multiple simultaneous bookings are not supported in this version. This feature may be added in future updates.'
-          );
+              'You already have an active booking. Please complete your current booking before making a new one.\n\nNote: Multiple simultaneous bookings are not supported in this version. This feature may be added in future updates.');
         }
 
         // Check if spot is still available
@@ -176,7 +176,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
         target: LatLng(position.latitude, position.longitude),
         zoom: 14,
       );
-    }    // Fallback to default coordinates if location is not available
+    } // Fallback to default coordinates if location is not available
     return const CameraPosition(
       target: LatLng(23.7624, 90.3785),
       zoom: 14,

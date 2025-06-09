@@ -5,6 +5,7 @@ import '../services/expired_spot_tracker.dart';
 import '../services/dialog_service.dart';
 import '../services/error_service.dart';
 import '../services/booking_service.dart';
+import '../services/parking_session_service.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/date_time_utils.dart';
 import '../utils/app_constants.dart';
@@ -30,6 +31,9 @@ class _HomePageState extends State<HomePage> {
     // Check for expired spots once when page loads
     // Global tracker will handle periodic updates
     _checkExpiredSpotsOnLoad();
+
+    // Check for completed parking sessions
+    _checkCompletedParkingSessions();
   }
 
   // Check expired spots once when page loads using global tracker
@@ -42,6 +46,203 @@ class _HomePageState extends State<HomePage> {
       operationName: AppStrings.checkExpiredSpotsOperation,
       showSnackBar: false, // Silent background operation
     );
+  }
+
+  // Check for completed parking sessions (1 open + 1 close)
+  Future<void> _checkCompletedParkingSessions() async {
+    try {
+      final completedSessions =
+          await ParkingSessionService.getCompletedSessions();
+
+      if (completedSessions.isNotEmpty) {
+        // Show prompt for the first completed session
+        final bookingId = completedSessions.first;
+        _showUnbookCompletedSessionDialog({'bookingId': bookingId});
+      }
+    } catch (e) {
+      // Silent failure - don't interrupt user experience
+      print('Error checking completed parking sessions: $e');
+    }
+  }
+
+  // Show dialog to unbook completed parking session
+  Future<void> _showUnbookCompletedSessionDialog(
+      Map<String, dynamic> session) async {
+    final bookingId = session['bookingId'] as String;
+
+    // Get booking details
+    final bookingDoc = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .get();
+
+    if (!bookingDoc.exists) {
+      // Session exists but booking doesn't - clean it up
+      await ParkingSessionService.clearSession(bookingId);
+      return;
+    }
+
+    final bookingData = bookingDoc.data()!;
+    final address = bookingData['address'] as String? ?? 'Unknown location';
+
+    // Get actual parking session data with timestamps
+    final sessionSummary =
+        await ParkingSessionService.getSessionSummary(bookingId);
+    final lastCommand = sessionSummary['lastCommand'] as Map<String, dynamic>?;
+    final commandCounts =
+        await ParkingSessionService.getCommandCounts(bookingId);
+
+    final openCount = commandCounts['open'] ?? 0;
+    final closeCount = commandCounts['close'] ?? 0;
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.help_outline, color: Colors.orange, size: 48),
+        title: const Text('Parking Session Detected'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'We detected activity at your parking spot:',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              address,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal.shade700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.login, color: Colors.green.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('Gate opened: $openCount time(s)')),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.logout,
+                          color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('Gate closed: $closeCount time(s)')),
+                    ],
+                  ),
+                  if (lastCommand != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time,
+                            color: Colors.blue.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(
+                                'Last activity: ${DateTimeUtils.formatTime(context, lastCommand['timestamp'])} on ${DateTimeUtils.formatDate(lastCommand['timestamp'])}')),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Have you finished parking? Would you like to unbook this spot?',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // User chose to keep the booking - clear the session
+              ParkingSessionService.clearSession(bookingId);
+            },
+            child: const Text('Keep Booking'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check),
+            label: const Text('Unbook Now'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _unbookCompletedSession(bookingId, address);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Unbook a completed parking session
+  Future<void> _unbookCompletedSession(String bookingId, String address) async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Unbooking parking spot...'),
+            ],
+          ),
+        ),
+      );
+
+      // Cancel the booking
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .update({
+        'status': 'cancelled',
+        'endTime': FieldValue.serverTimestamp(),
+      });
+
+      // Clear the parking session
+      await ParkingSessionService.clearSession(bookingId);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        SnackBarUtils.showSuccess(
+          context,
+          'Parking spot unbooked successfully! Thank you for using our service at: $address',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        SnackBarUtils.showError(
+          context,
+          'Failed to unbook parking spot: $e',
+        );
+      }
+    }
   }
 
   // Check and cleanup expired bookings when detected in UI
@@ -262,11 +463,12 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               // Action buttons row
               Row(
-                children: [                  // QR Scanner button
+                children: [
+                  // QR Scanner button
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () =>
-                          _openQrScannerForBookedSpot(context, spotId, address, bookingId),
+                      onPressed: () => _openQrScannerForBookedSpot(
+                          context, spotId, address, bookingId),
                       icon: const Icon(Icons.qr_code_scanner, size: 18),
                       label: Text(
                         AppStrings.scanQrCodeMenuItem,
@@ -343,6 +545,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
   // Method to open QR scanner for booked spots
   void _openQrScannerForBookedSpot(
       BuildContext context, String spotId, String address, String bookingId) {
@@ -661,26 +864,31 @@ class _HomePageState extends State<HomePage> {
                             final spotData = spotSnapshot.data!.data()
                                 as Map<String, dynamic>;
                             final availableUntilTimestamp =
-                                spotData['availableUntil'] as Timestamp?;                            if (availableUntilTimestamp != null) {
+                                spotData['availableUntil'] as Timestamp?;
+                            if (availableUntilTimestamp != null) {
                               final availableUntil =
                                   availableUntilTimestamp.toDate();
                               final now = DateTime.now();
                               final remaining = availableUntil.difference(now);
-                              
+
                               if (remaining.isNegative) {
                                 remainingText = AppStrings.expired;
                                 // Trigger expiration check when we detect expired booking
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                WidgetsBinding.instance
+                                    .addPostFrameCallback((_) {
                                   _checkExpiredBookings();
                                 });
                               } else {
                                 final hours = remaining.inHours;
                                 final minutes = remaining.inMinutes % 60;
-                                remainingText = '${hours}h ${minutes}m remaining';
-                                
+                                remainingText =
+                                    '${hours}h ${minutes}m remaining';
+
                                 // Show warning if less than 30 minutes remaining
-                                if (remaining.inMinutes <= 30 && remaining.inMinutes > 0) {
-                                  remainingText = '⚠️ $remainingText (expiring soon!)';
+                                if (remaining.inMinutes <= 30 &&
+                                    remaining.inMinutes > 0) {
+                                  remainingText =
+                                      '⚠️ $remainingText (expiring soon!)';
                                 }
                               }
                             } else {

@@ -13,7 +13,8 @@ class ListingHistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;    if (user == null) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       return Scaffold(
         appBar: AppBar(title: Text(AppStrings.myListedSpots)),
         body: Center(
@@ -32,8 +33,10 @@ class ListingHistoryPage extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          }          if (snapshot.hasError) {
-            return Center(child: Text('${AppStrings.errorLoading}${snapshot.error}'));
+          }
+          if (snapshot.hasError) {
+            return Center(
+                child: Text('${AppStrings.errorLoading}${snapshot.error}'));
           }
           final spots = snapshot.data?.docs ?? [];
           if (spots.isEmpty) {
@@ -43,7 +46,9 @@ class ListingHistoryPage extends StatelessWidget {
             itemCount: spots.length,
             itemBuilder: (context, index) {
               final spot = spots[index];
-              final data = spot.data() as Map<String, dynamic>;              final address = data['address'] as String? ?? AppStrings.noAddress;
+              final data = spot.data() as Map<String, dynamic>;
+              final address =
+                  data['address'] as String? ?? AppStrings.noAddress;
               final spotId = spot.id;
               final isAvailable = data['isAvailable'] ==
                   true; // Check availability status based on time
@@ -72,7 +77,8 @@ class ListingHistoryPage extends StatelessWidget {
                 child: ListTile(
                   title: Text(address),
                   subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,                    children: [
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text('${AppStrings.spotIdPrefix}$spotId'),
                       Row(
                         children: [
@@ -95,7 +101,8 @@ class ListingHistoryPage extends StatelessWidget {
                                   .where('status', isEqualTo: 'active')
                                   .limit(1)
                                   .snapshots(),
-                              builder: (context, bookingSnapshot) {                                if (bookingSnapshot.connectionState ==
+                              builder: (context, bookingSnapshot) {
+                                if (bookingSnapshot.connectionState ==
                                     ConnectionState.waiting) {
                                   return Text(
                                     AppStrings.checking,
@@ -138,7 +145,8 @@ class ListingHistoryPage extends StatelessWidget {
                               ),
                             ),
                         ],
-                      ),                      if (availableUntil != null)
+                      ),
+                      if (availableUntil != null)
                         Text(
                           '${AppStrings.availableUntilPrefix}${DateTimeUtils.formatDateTime(context, availableUntil)}',
                           style: TextStyle(
@@ -147,9 +155,11 @@ class ListingHistoryPage extends StatelessWidget {
                           ),
                         ),
                     ],
-                  ),                  trailing: Row(
+                  ),
+                  trailing: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: [                      // Re-enable button for expired spots (show for all expired spots, regardless of isAvailable status)
+                    children: [
+                      // Re-enable button for expired spots (show for all expired spots, regardless of isAvailable status)
                       if (isTimeExpired)
                         IconButton(
                           icon: const Icon(Icons.refresh, color: Colors.green),
@@ -164,17 +174,24 @@ class ListingHistoryPage extends StatelessWidget {
                           tooltip: AppStrings.editAvailabilityLabel,
                           onPressed: () async {
                             // Check for active booking before showing dialog
-                            final activeBooking = await FirebaseFirestore.instance
+                            final activeBooking = await FirebaseFirestore
+                                .instance
                                 .collection('bookings')
                                 .where('spotId', isEqualTo: spotId)
                                 .where('status', isEqualTo: 'active')
                                 .limit(1)
                                 .get();
-                            final bool hasActiveBooking = activeBooking.docs.isNotEmpty;
-                            
+                            final bool hasActiveBooking =
+                                activeBooking.docs.isNotEmpty;
+
                             if (context.mounted) {
-                              _showEditAvailabilityDialog(context,
-                                  spotId, availableUntil, isAvailable, address, hasActiveBooking);
+                              _showEditAvailabilityDialog(
+                                  context,
+                                  spotId,
+                                  availableUntil,
+                                  isAvailable,
+                                  address,
+                                  hasActiveBooking);
                             }
                           },
                         ),
@@ -189,7 +206,8 @@ class ListingHistoryPage extends StatelessWidget {
                             ),
                           );
                         },
-                      ),                      IconButton(
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
                         tooltip: AppStrings.deleteLabel,
                         onPressed: () async {
@@ -200,14 +218,15 @@ class ListingHistoryPage extends StatelessWidget {
                               .where('status', isEqualTo: 'active')
                               .limit(1)
                               .get();
-                          final bool isBooked = activeBooking.docs.isNotEmpty;                          final confirm =
+                          final bool isBooked = activeBooking.docs.isNotEmpty;
+                          final confirm =
                               await DialogService.showDeleteWarningDialog(
                             context: context,
                             title: AppStrings.deleteSpotTitle,
                             address: address,
                             hasActiveBooking: isBooked,
                           );
-                          
+
                           if (confirm == true && context.mounted) {
                             await ErrorService.executeWithErrorHandling(
                               context,
@@ -216,13 +235,14 @@ class ListingHistoryPage extends StatelessWidget {
                                     .collection('parking_spots')
                                     .doc(spotId)
                                     .delete();
-                                
+
                                 if (context.mounted) {
-                                  SnackBarUtils.showSuccess(
-                                      context, AppStrings.spotDeletedSuccessfully);
+                                  SnackBarUtils.showSuccess(context,
+                                      AppStrings.spotDeletedSuccessfully);
                                 }
                               },
-                              operationName: ErrorStrings.deleteParkingSpotOperation,
+                              operationName:
+                                  ErrorStrings.deleteParkingSpotOperation,
                             );
                           }
                         },
@@ -237,6 +257,7 @@ class ListingHistoryPage extends StatelessWidget {
       ),
     );
   }
+
   // Method to show re-enable availability dialog for expired spots
   static Future<void> _showReEnableDialog(
     BuildContext context,
@@ -274,7 +295,8 @@ class ListingHistoryPage extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.orange.shade600, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.orange.shade600, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -289,7 +311,8 @@ class ListingHistoryPage extends StatelessWidget {
               ),
             ),
           ],
-        ),        actions: [
+        ),
+        actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(AppStrings.cancel),
@@ -310,7 +333,9 @@ class ListingHistoryPage extends StatelessWidget {
             ),
           ),
         ],
-      ),    );    if (confirm == true && context.mounted) {
+      ),
+    );
+    if (confirm == true && context.mounted) {
       _showEditAvailabilityDialog(context, spotId, null, true, address, false);
     }
   }
@@ -324,14 +349,15 @@ class ListingHistoryPage extends StatelessWidget {
     String address,
     bool hasActiveBooking,
   ) async {
-    DateTime? selectedDateTime = currentAvailableUntil;    await showDialog(
-      context: context,      builder: (context) => StatefulBuilder(
+    DateTime? selectedDateTime = currentAvailableUntil;
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text(
-            currentAvailableUntil == null || currentAvailableUntil.isBefore(DateTime.now())
-                ? 'Set Availability Time'
-                : AppStrings.editAvailabilityTitle
-          ),
+          title: Text(currentAvailableUntil == null ||
+                  currentAvailableUntil.isBefore(DateTime.now())
+              ? 'Set Availability Time'
+              : AppStrings.editAvailabilityTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +368,8 @@ class ListingHistoryPage extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: Colors.grey[700],
                 ),
-              ),              const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 16),
               if (hasActiveBooking)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -378,7 +405,8 @@ class ListingHistoryPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: ListTile(
-                  leading: const Icon(Icons.access_time_outlined),                  title: Text(
+                  leading: const Icon(Icons.access_time_outlined),
+                  title: Text(
                     selectedDateTime == null
                         ? AppStrings.selectAvailabilityUntil
                         : '${AppStrings.availableUntilPrefix}${DateTimeUtils.formatDateTime(context, selectedDateTime!)}',
@@ -424,7 +452,8 @@ class ListingHistoryPage extends StatelessWidget {
                 ),
               ),
             ],
-          ),          actions: [
+          ),
+          actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(AppStrings.cancel),
@@ -448,6 +477,7 @@ class ListingHistoryPage extends StatelessWidget {
       ),
     );
   }
+
   // Method to update availability in Firestore
   static Future<void> _updateAvailability(
     BuildContext context,
@@ -463,7 +493,8 @@ class ListingHistoryPage extends StatelessWidget {
             .update({
           'availableUntil': Timestamp.fromDate(newAvailableUntil),
           'isAvailable': true, // Re-enable availability
-        });        if (context.mounted) {
+        });
+        if (context.mounted) {
           SnackBarUtils.showSuccess(context,
               '${AppStrings.availabilityUpdatedSuccessfully}${DateTimeUtils.formatDateTime(context, newAvailableUntil)}');
         }
