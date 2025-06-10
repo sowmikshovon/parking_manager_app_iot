@@ -10,7 +10,7 @@ SoftwareSerial bluetooth(2,3); // RX, TX for SoftwareSerial
 // Servo G90
 Servo gateServo;
 const int servoPin = 9;
-const int gateOpenAngle = 90;   // Angle for "open" position (adjust as needed)
+const int gateOpenAngle = 91;   // Angle for "open" position (adjust as needed)
 const int gateClosedAngle = 0;  // Angle for "closed" position (adjust as needed)
 
 // LCD 16x2 I2C

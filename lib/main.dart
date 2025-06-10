@@ -5,9 +5,14 @@ import 'firebase_options.dart';
 import './pages/permission_setup_page.dart';
 import './services/expired_spot_tracker.dart';
 import './services/booking_service.dart';
+import './services/api_key_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize and validate API keys BEFORE Firebase
+  await ApiKeyService.initialize();
+  
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Start global expired spot tracking

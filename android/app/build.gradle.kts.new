@@ -8,13 +8,6 @@ plugins {
 
 import java.util.Properties
 
-// Define localProperties at the android block level
-val localProperties = Properties()
-val localPropertiesFile = rootProject.file("local.properties") // This refers to android/local.properties
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.inputStream().use { localProperties.load(it) }
-}
-
 android {
     namespace = "com.example.parking_manager_app_iot"
     compileSdk = flutter.compileSdkVersion
@@ -30,7 +23,13 @@ android {
     }
 
     defaultConfig {
-        // Access localProperties defined above
+        // Load API keys from local.properties
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { localProperties.load(it) }
+        }
+
         // Set manifest placeholders for API keys
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY") ?: ""
 
@@ -41,19 +40,10 @@ android {
         versionName = flutter.versionName
     }
 
-    signingConfigs {
-        create("release") {
-            keyAlias = localProperties.getProperty("KEY_ALIAS")
-            keyPassword = localProperties.getProperty("KEY_PASSWORD")
-            storeFile = rootProject.file(localProperties.getProperty("KEYSTORE_PATH") ?: "your-keystore-name.jks")
-            storePassword = localProperties.getProperty("KEYSTORE_PASSWORD")
-        }
-    }
-
     buildTypes {
         release {
-            // Use the release signing configuration
-            signingConfig = signingConfigs.getByName("release")
+            // For now, using debug keys (CHANGE FOR PRODUCTION!)
+            signingConfig = signingConfigs.getByName("debug")
             
             // Enable code shrinking and obfuscation for production
             isMinifyEnabled = true

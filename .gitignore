@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# API Keys and sensitive configuration
+android/local.properties
+**/local.properties
+
+# Firebase configuration (optional - uncomment if you want to secure these too)
+# android/app/google-services.json
+# lib/firebase_options.dart
