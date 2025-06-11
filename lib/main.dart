@@ -9,10 +9,10 @@ import './services/api_key_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize and validate API keys BEFORE Firebase
   await ApiKeyService.initialize();
-  
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Start global expired spot tracking
