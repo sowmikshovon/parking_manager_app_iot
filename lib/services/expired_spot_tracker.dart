@@ -42,13 +42,10 @@ class ExpiredSpotTracker {
         for (QueryDocumentSnapshot spot in expiredSpots.docs) {
           batch.update(spot.reference, {'isAvailable': false});
         }
-        await batch.commit();
-
-        print(
-            'ExpiredSpotTracker: Updated ${expiredSpots.docs.length} expired spots to unavailable');
+        await batch.commit(); // Debug logging disabled in production
       }
     } catch (e) {
-      print('Error in ExpiredSpotTracker: $e');
+      // Debug logging disabled in production
     }
   }
 }

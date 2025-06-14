@@ -129,7 +129,7 @@ class UserService {
       }
 
       ErrorHandler.validateEmail(newEmail);
-      await user.updateEmail(newEmail.trim());
+      await user.verifyBeforeUpdateEmail(newEmail.trim());
 
       // Update email in user profile document
       await updateUserProfile({'email': newEmail.trim()});
@@ -213,14 +213,15 @@ class UserService {
 
       // Prepare update data
       final Map<String, dynamic> updateData = {};
-
       if (firstName != null) updateData['firstName'] = firstName.trim();
       if (lastName != null) updateData['lastName'] = lastName.trim();
-      if (dateOfBirth != null)
+      if (dateOfBirth != null) {
         updateData['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+      }
       if (gender != null) updateData['gender'] = gender;
-      if (profileImageUrl != null)
+      if (profileImageUrl != null) {
         updateData['profileImageUrl'] = profileImageUrl;
+      }
 
       // Update profile
       await updateUserProfile(updateData);
@@ -326,13 +327,20 @@ class UserService {
   static Future<Result<bool>> isEmailRegistered(String email) async {
     return Result.execute(() async {
       ErrorHandler.validateEmail(email);
-
       try {
-        final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
-        return methods.isNotEmpty;
+        // Use a different approach to check if email exists
+        // Try to sign in with a dummy password to trigger appropriate error
+        await _auth.signInWithEmailAndPassword(
+            email: email.trim(),
+            password: 'dummy_password_to_check_email_existence');
+        return true; // If no error, email exists
       } catch (e) {
-        if (e is FirebaseAuthException && e.code == 'user-not-found') {
-          return false;
+        if (e is FirebaseAuthException) {
+          if (e.code == 'user-not-found') {
+            return false;
+          } else if (e.code == 'wrong-password') {
+            return true; // Email exists but wrong password
+          }
         }
         rethrow;
       }

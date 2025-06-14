@@ -182,11 +182,10 @@ class BluetoothPermissionHelper {
         context: context,
         permissionResult: result,
       );
-
-      if (openSettings) {
+      if (openSettings && result.settingsType != null) {
         // User chose to open settings, show guidance dialog
         if (context.mounted) {
-          _showPostSettingsDialog(context, result.settingsType);
+          _showPostSettingsDialog(context, result.settingsType!);
         }
       }
 

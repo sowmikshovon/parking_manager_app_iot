@@ -282,7 +282,7 @@ class _BookSpotPageState extends State<BookSpotPage> {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Parking Manager',
+                    'IoT Parking',
                     style: TextStyle(color: Colors.white, fontSize: 20),
                   ),
                   const SizedBox(height: 5),

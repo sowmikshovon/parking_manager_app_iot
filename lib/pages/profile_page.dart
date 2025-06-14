@@ -119,11 +119,10 @@ class _ProfilePageState extends State<ProfilePage> {
       if (user != null) {
         final storageRef =
             FirebaseStorage.instance.ref().child('profile_images');
-        await storageRef.listAll();
-        print('Firebase Storage connection successful');
+        await storageRef.listAll(); // Debug logging disabled in production
       }
     } catch (e) {
-      print('Firebase Storage connection test failed: $e');
+      // Debug logging disabled in production
       // Don't show error to user for this test, just log it
     }
   }
@@ -185,7 +184,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     } catch (e) {
       setState(() {
-        _error = AppStrings.failedToPickImage + ': $e';
+        _error = '${AppStrings.failedToPickImage}: $e';
       });
     }
   }
@@ -235,7 +234,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (!await _imageFile!.exists()) {
         setState(() {
-          _error = AppStrings.imageFileDoesNotExist + ': ${_imageFile!.path}';
+          _error = '${AppStrings.imageFileDoesNotExist}: ${_imageFile!.path}';
         });
         return null;
       }
@@ -246,7 +245,7 @@ class _ProfilePageState extends State<ProfilePage> {
         return null;
       }
 
-      print('Attempting to upload image to: ${storageRef.fullPath}');
+      // Debug logging disabled in production
       UploadTask uploadTask = storageRef.putFile(_imageFile!, metadata);
 
       // Await the completion of the upload task
@@ -255,39 +254,35 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (snapshot.state == TaskState.success) {
         final String downloadUrl = await snapshot.ref.getDownloadURL();
-        print('Image uploaded successfully. Download URL: $downloadUrl');
+        // Debug logging disabled in production
         return downloadUrl;
       } else {
-        // This case might not be hit if errors throw exceptions instead
-        print(
-            'Image upload failed. State: ${snapshot.state}, Bytes Transferred: ${snapshot.bytesTransferred}/${snapshot.totalBytes}');
+        // This case might not be hit if errors throw exceptions instead        // Debug logging disabled in production
         setState(() {
           _error = AppStrings.imageUploadFailedState + ': ${snapshot.state}';
         });
         return null;
       }
     } on FirebaseException catch (e) {
-      print(
-          'Firebase Storage Exception during image upload. Code: ${e.code}. Message: ${e.message}. StackTrace: ${e.stackTrace}');
-      String displayError = AppStrings.imageUploadFailed +
-          ': ${e.message ?? "Unknown Firebase error"}';
+      // Debug logging disabled in production
+      String displayError =
+          '${AppStrings.imageUploadFailed}: ${e.message ?? "Unknown Firebase error"}';
       if (e.code == 'object-not-found') {
-        displayError = AppStrings.imageUploadFailed +
-            ': The file was not found after attempting upload. Check permissions or network.';
+        displayError =
+            '${AppStrings.imageUploadFailed}: The file was not found after attempting upload. Check permissions or network.';
       } else if (e.code == 'unauthorized' || e.code == 'permission-denied') {
-        displayError = AppStrings.imageUploadFailed +
-            ': Permission denied. Check Firebase Storage rules.';
+        displayError =
+            '${AppStrings.imageUploadFailed}: Permission denied. Check Firebase Storage rules.';
       }
       setState(() {
         _error = displayError;
       });
       return null;
     } catch (e, stackTrace) {
-      print(
-          'Generic Exception during image upload: $e. StackTrace: $stackTrace');
+      // Debug logging disabled in production
       setState(() {
         _error =
-            AppStrings.imageUploadFailed + ': An unexpected error occurred. $e';
+            '${AppStrings.imageUploadFailed}: An unexpected error occurred. $e';
       });
       return null;
     }
@@ -330,7 +325,7 @@ class _ProfilePageState extends State<ProfilePage> {
             SnackBarUtils.showError(
                 context,
                 _error ??
-                    AppStrings.imageUploadFailed + '. Profile not saved.');
+                    '${AppStrings.imageUploadFailed}. Profile not saved.');
           }
           return;
         }
@@ -369,18 +364,15 @@ class _ProfilePageState extends State<ProfilePage> {
             context, AppStrings.profileUpdatedSuccessfully);
       }
     } on FirebaseException catch (e) {
-      // Catch Firestore specific errors
-      print(
-          'Firestore Exception during profile save: ${e.code} - ${e.message}');
+      // Catch Firestore specific errors      // Debug logging disabled in production
       setState(() {
-        _error = AppStrings.failedToSaveProfile +
-            ': ${e.message ?? "Unknown Firebase error"} (Code: ${e.code})';
+        _error =
+            '${AppStrings.failedToSaveProfile}: ${e.message ?? "Unknown Firebase error"} (Code: ${e.code})';
       });
     } catch (e) {
-      // Catch any other errors
-      print('Generic Exception during profile save: $e');
+      // Catch any other errors      // Debug logging disabled in production
       setState(() {
-        _error = AppStrings.failedToSaveProfile + ': $e';
+        _error = '${AppStrings.failedToSaveProfile}: $e';
       });
     } finally {
       setState(() {

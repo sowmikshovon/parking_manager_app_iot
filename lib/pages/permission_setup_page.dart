@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/bluetooth_service.dart';
-import '../widgets/bluetooth_permission_helper.dart';
 import 'login_page.dart';
 import 'home_page.dart';
 
@@ -32,45 +31,26 @@ class _PermissionSetupPageState extends State<PermissionSetupPage> {
 
     try {
       // Check if user is already authenticated
-      final user = FirebaseAuth.instance.currentUser;
-
-      // Step 1: Request comprehensive permissions for the app
+      final user = FirebaseAuth.instance
+          .currentUser; // Step 1: Request basic permissions for the app (not HC-05 specific)
       setState(() {
-        _statusMessage = 'Requesting Bluetooth and location permissions...';
+        _statusMessage = 'Requesting camera and location permissions...';
       });
 
-      final result = await BluetoothService.requestPermissionsWithSetup();
+      final hasBasicPermissions = await BluetoothService.requestPermissions();
 
-      if (!result.hasPermissions || result.shouldOpenSettings) {
-        setState(() {
-          _permissionsGranted = false;
-          _statusMessage = result.message;
-        });
-        return;
-      }
-
-      // Step 2: Check for HC-05 pairing
-      setState(() {
-        _statusMessage = 'Checking for HC-05 device pairing...';
-      });
-
-      final hc05Devices = await BluetoothService.findHC05Devices();
-
-      if (hc05Devices.isEmpty) {
-        // No HC-05 devices found, but permissions are granted
-        // Show pairing guidance
+      if (!hasBasicPermissions) {
         setState(() {
           _permissionsGranted = false;
           _statusMessage =
-              'Bluetooth permissions granted. HC-05 module pairing required for IoT features.';
+              'Camera and location permissions are required for the app to function properly.';
         });
         return;
-      }
-
-      // Step 3: All requirements met
+      } // Step 2: Basic permissions granted - setup complete
       setState(() {
         _permissionsGranted = true;
-        _statusMessage = 'Setup complete! HC-05 device found and ready to use.';
+        _statusMessage =
+            'Basic permissions granted! App is ready to use. HC-05 pairing will be checked when using QR scanner.';
       });
 
       // Small delay to show success message
@@ -104,237 +84,69 @@ class _PermissionSetupPageState extends State<PermissionSetupPage> {
 
   Future<void> _requestPermissionsAgain() async {
     if (mounted) {
-      final result =
-          await BluetoothPermissionHelper.requestPermissionsWithDialog(context);
-      if (result) {
-        _initializePermissions();
-      }
+      _initializePermissions(); // Just retry initialization
     }
   }
 
-  Future<void> _showPairingGuidance() async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon:
-            const Icon(Icons.bluetooth_searching, color: Colors.blue, size: 48),
-        title: const Text('Pair with HC-05 Module'),
-        content: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.6,
-            maxWidth: MediaQuery.of(context).size.width * 0.9,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'To enable automatic gate control, please pair with your HC-05 Bluetooth module:',
-                  style: TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Pairing Steps:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '1. Ensure HC-05 module is powered on\n'
-                        '2. Open Bluetooth settings on your phone\n'
-                        '3. Look for "HC-05" or similar device\n'
-                        '4. Pair with PIN: 1234 or 0000\n'
-                        '5. Return to this app and retry setup',
-                        style: TextStyle(
-                          color: Colors.blue.shade600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Icon(Icons.lightbulb_outline,
-                        color: Colors.amber.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'The HC-05 LED should be blinking slowly when ready to pair.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.amber.shade700,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('I\'ll Do This Later'),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.settings),
-            label: const Text('Open Bluetooth Settings'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await BluetoothService.openBluetoothSettings(
-                BluetoothSettingsType.bluetoothPairing,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _retrySetup() async {
-    _initializePermissions();
-  }
-
   String _getSetupTitle() {
-    if (_statusMessage.contains('HC-05') ||
-        _statusMessage.contains('pairing')) {
-      return 'HC-05 Device Pairing Required';
-    } else if (_statusMessage.contains('permission') ||
-        _statusMessage.contains('Bluetooth')) {
-      return 'Bluetooth Permissions Required';
+    if (_statusMessage.contains('permission')) {
+      return 'App Permissions Required';
     } else {
-      return 'IoT Features Setup';
+      return 'App Setup';
     }
   }
 
   String _getSetupDescription() {
-    if (_statusMessage.contains('HC-05') ||
-        _statusMessage.contains('pairing')) {
-      return 'Bluetooth permissions are granted, but no HC-05 device is paired. To enable automatic gate control, please pair with your HC-05 Bluetooth module.';
-    } else if (_statusMessage.contains('permission') ||
-        _statusMessage.contains('Bluetooth')) {
-      return 'This app needs Bluetooth and location permissions to communicate with HC-05 modules for automatic gate control.';
+    if (_statusMessage.contains('permission')) {
+      return 'This app needs camera and location permissions to function properly. Bluetooth features will be checked when using IoT controls.';
     } else {
-      return 'This app can communicate with HC-05 Bluetooth modules to control parking gates automatically. Please complete the setup to enable this feature.';
+      return 'This app can communicate with IoT devices to control parking gates automatically. Basic permissions are required to continue.';
     }
   }
 
   Widget _buildActionButtons() {
-    if (_statusMessage.contains('HC-05') ||
-        _statusMessage.contains('pairing')) {
-      // HC-05 pairing required
-      return Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _showPairingGuidance,
-              icon: const Icon(Icons.bluetooth_searching),
-              label: const Text('Pair HC-05 Module'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
+    // Only basic permissions required
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _requestPermissionsAgain,
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Grant Permissions'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: _retrySetup,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Check Again'),
-                ),
-              ),
-              Expanded(
-                child: TextButton(
-                  onPressed: _continueWithoutPermissions,
-                  child: const Text('Skip for Now'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-    } else {
-      // Bluetooth permissions required
-      return Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _requestPermissionsAgain,
-              icon: const Icon(Icons.bluetooth),
-              label: const Text('Setup Bluetooth'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextButton(
+            onPressed: _continueWithoutPermissions,
+            child: const Text('Skip for Now'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextButton(
-              onPressed: _continueWithoutPermissions,
-              child: const Text('Skip for Now'),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
+        ),
+      ],
+    );
   }
 
   IconData _getStatusIcon() {
-    if (_statusMessage.contains('HC-05') ||
-        _statusMessage.contains('pairing')) {
-      return Icons.bluetooth_searching;
-    } else if (_statusMessage.contains('permission') ||
-        _statusMessage.contains('Bluetooth')) {
-      return Icons.bluetooth_disabled;
+    if (_statusMessage.contains('permission')) {
+      return Icons.security;
     } else {
-      return Icons.warning;
+      return Icons.check_circle;
     }
   }
 
   Color _getStatusIconColor() {
-    if (_statusMessage.contains('HC-05') ||
-        _statusMessage.contains('pairing')) {
-      return Colors.blue.shade600;
-    } else if (_statusMessage.contains('permission') ||
-        _statusMessage.contains('Bluetooth')) {
+    if (_statusMessage.contains('permission')) {
       return Colors.orange.shade600;
     } else {
-      return Colors.red.shade600;
+      return Colors.green.shade600;
     }
   }
 
@@ -398,7 +210,7 @@ class _PermissionSetupPageState extends State<PermissionSetupPage> {
 
                   // App Title
                   const Text(
-                    'Parking Manager IoT',
+                    'IoT Parking',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -414,7 +226,7 @@ class _PermissionSetupPageState extends State<PermissionSetupPage> {
                     'Smart parking with IoT gate control',
                     style: TextStyle(
                       fontSize: 18,
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -509,10 +321,10 @@ class _PermissionSetupPageState extends State<PermissionSetupPage> {
                   if (!_isCheckingPermissions && !_permissionsGranted) ...[
                     const SizedBox(height: 16),
                     Text(
-                      'You can enable IoT features later in the app settings.',
+                      'You can enable specific IoT features (like HC-05 pairing) when needed.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
                       textAlign: TextAlign.center,
                     ),

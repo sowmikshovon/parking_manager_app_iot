@@ -32,7 +32,137 @@ class _QrScannerWithBluetoothPageState
   bool _isProcessing = false;
   bool _isFlashOn = false;
   bool _scannerPaused = false;
+  bool _hc05CheckCompleted = false;
   StreamSubscription<String>? _bluetoothSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkHC05Pairing();
+  }
+
+  Future<void> _checkHC05Pairing() async {
+    try {
+      // Check if HC-05 devices are paired
+      final hc05Devices = await BluetoothService.findHC05Devices();
+
+      if (hc05Devices.isEmpty) {
+        // No HC-05 devices found, show pairing dialog
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showHC05PairingDialog();
+        });
+      } else {
+        // HC-05 devices found, allow scanning
+        setState(() {
+          _hc05CheckCompleted = true;
+        });
+      }
+    } catch (e) {
+      // Error checking devices, show pairing dialog as fallback
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showHC05PairingDialog();
+      });
+    }
+  }
+
+  Future<void> _showHC05PairingDialog() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon:
+            const Icon(Icons.bluetooth_searching, color: Colors.blue, size: 48),
+        title: const Text('HC-05 Device Required'),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.9,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'To scan QR codes and control parking gates, you need to pair with an HC-05 Bluetooth module.',
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              color: Colors.blue.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Pairing Instructions:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '1. Turn on your HC-05 device\n'
+                        '2. Open Bluetooth settings on your phone\n'
+                        '3. Look for "HC-05" in available devices\n'
+                        '4. Pair with PIN: 1234 or 0000\n'
+                        '5. Return to this app',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pop(); // Go back to previous page
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _checkHC05Pairing(); // Retry check
+            },
+            child: const Text('Check Again'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.settings),
+            label: const Text('Open Bluetooth Settings'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await BluetoothService.openBluetoothSettings(
+                BluetoothSettingsType.bluetoothPairing,
+              );
+              // Check again after user returns
+              _checkHC05Pairing();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     cameraController.dispose();
@@ -49,175 +179,216 @@ class _QrScannerWithBluetoothPageState
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: Icon(
-              _isFlashOn ? Icons.flash_on : Icons.flash_off,
-              color: _isFlashOn ? Colors.yellow : Colors.grey,
+          if (_hc05CheckCompleted)
+            IconButton(
+              icon: Icon(
+                _isFlashOn ? Icons.flash_on : Icons.flash_off,
+                color: _isFlashOn ? Colors.yellow : Colors.grey,
+              ),
+              onPressed: () async {
+                await cameraController.toggleTorch();
+                setState(() {
+                  _isFlashOn = !_isFlashOn;
+                });
+              },
             ),
-            onPressed: () async {
-              await cameraController.toggleTorch();
-              setState(() {
-                _isFlashOn = !_isFlashOn;
-              });
-            },
-          ),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.teal.shade600,
-              Colors.teal.shade400,
-              Colors.teal.shade200,
-            ],
-          ),
-        ),
-        child: Column(
-          children: [
-            // Instructions
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Icon(Icons.qr_code_scanner,
-                          size: 32, color: Colors.teal.shade700),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Scan QR Code for:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal.shade800,
-                        ),
+      body: !_hc05CheckCompleted
+          ? Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.teal.shade600,
+                    Colors.teal.shade400,
+                    Colors.teal.shade200,
+                  ],
+                ),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Checking HC-05 device pairing...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.address,
-                        style: const TextStyle(fontSize: 14),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.teal.shade600,
+                    Colors.teal.shade400,
+                    Colors.teal.shade200,
+                  ],
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Instructions
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
                           children: [
-                            Icon(Icons.bluetooth,
-                                size: 16, color: Colors.blue.shade700),
-                            const SizedBox(width: 4),
+                            Icon(Icons.qr_code_scanner,
+                                size: 32, color: Colors.teal.shade700),
+                            const SizedBox(height: 8),
                             Text(
-                              'IoT Gate Control Enabled',
+                              'Scan QR Code for:',
                               style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue.shade700,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal.shade800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.address,
+                              style: const TextStyle(fontSize: 14),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.bluetooth,
+                                      size: 16, color: Colors.blue.shade700),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'IoT Gate Control Enabled',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ),
 
-            // Camera Scanner
-            Expanded(
-              flex: 3,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: MobileScanner(
-                    controller: cameraController,
-                    onDetect: _onQRViewCreated,
-                  ),
-                ),
-              ),
-            ),
-
-            // Bottom section with instructions
-            Expanded(
-              flex: 1,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_isProcessing)
-                      Column(
-                        children: [
-                          const CircularProgressIndicator(color: Colors.white),
-                          const SizedBox(height: 16),
-                          Text(
-                            _scannerPaused
-                                ? 'Waiting for gate response...'
-                                : 'Processing QR code and connecting to gate...',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      )
-                    else if (_scannerPaused)
-                      Column(
-                        children: [
-                          Icon(
-                            Icons.pause_circle_outline,
-                            color: Colors.orange.shade300,
-                            size: 32,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Scanner paused. Listening for IoT response...',
-                            style: TextStyle(
-                              color: Colors.orange.shade200,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      )
-                    else
-                      Text(
-                        'Point your camera at the QR code provided by the parking spot owner',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
+                  // Camera Scanner
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
-                  ],
-                ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: MobileScanner(
+                          controller: cameraController,
+                          onDetect: _onQRViewCreated,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Bottom section with instructions
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_isProcessing)
+                            Column(
+                              children: [
+                                const CircularProgressIndicator(
+                                    color: Colors.white),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _scannerPaused
+                                      ? 'Waiting for gate response...'
+                                      : 'Processing QR code and connecting to gate...',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            )
+                          else if (_scannerPaused)
+                            Column(
+                              children: [
+                                Icon(
+                                  Icons.pause_circle_outline,
+                                  color: Colors.orange.shade300,
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Scanner paused. Listening for IoT response...',
+                                  style: TextStyle(
+                                    color: Colors.orange.shade200,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            )
+                          else
+                            Text(
+                              'Point your camera at the QR code provided by the parking spot owner',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+      floatingActionButton: !_hc05CheckCompleted
+          ? FloatingActionButton(
+              onPressed: _checkHC05Pairing,
+              backgroundColor: Colors.teal,
+              child: const Icon(Icons.refresh, color: Colors.white),
+            )
+          : null,
     );
   }
 
@@ -609,7 +780,9 @@ class _QrScannerWithBluetoothPageState
                 await BluetoothService.openBluetoothSettings(
                     result.settingsType!);
               }
-              Navigator.of(context).pop(); // Return to previous screen
+              if (mounted) {
+                Navigator.of(context).pop(); // Return to previous screen
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
@@ -706,7 +879,9 @@ class _QrScannerWithBluetoothPageState
               Navigator.of(context).pop();
               await BluetoothService.openBluetoothSettings(
                   BluetoothSettingsType.bluetoothPairing);
-              Navigator.of(context).pop(); // Return to previous screen
+              if (mounted) {
+                Navigator.of(context).pop(); // Return to previous screen
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,

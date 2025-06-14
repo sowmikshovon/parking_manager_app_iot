@@ -1,4 +1,4 @@
-/// Data models for the parking manager application
+/// Data models for the IoT parking application
 /// Provides structured data classes for ParkingSpot, Booking, and related entities
 library;
 

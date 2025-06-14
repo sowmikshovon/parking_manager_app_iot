@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -31,7 +32,9 @@ void _startBookingExpirationChecking() {
     try {
       await BookingService.checkAndExpireBookings();
     } catch (e) {
-      print('Error in periodic booking expiration check: $e');
+      if (kDebugMode) {
+        debugPrint('Error in periodic booking expiration check: $e');
+      }
     }
   });
 
@@ -40,7 +43,9 @@ void _startBookingExpirationChecking() {
     try {
       await BookingService.checkAndExpireBookings();
     } catch (e) {
-      print('Error in initial booking expiration check: $e');
+      if (kDebugMode) {
+        debugPrint('Error in initial booking expiration check: $e');
+      }
     }
   });
 }
@@ -51,7 +56,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Parking Manager',
+      title: 'IoT Parking',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(

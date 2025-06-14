@@ -15,11 +15,10 @@ class ApiKeyService {
       // Additional security checks
       _validateGoogleMapsKey();
       _validateFirebaseKey();
-
       _isInitialized = true;
-      print('✅ API keys validated successfully');
+      // Debug logging disabled in production
     } catch (e) {
-      print('❌ API key validation failed: $e');
+      // Debug logging disabled in production
       if (Environment.isProduction) {
         // In production, fail fast if keys are invalid
         throw Exception(
@@ -42,12 +41,10 @@ class ApiKeyService {
 
     if (mapsKey.length < 35) {
       throw Exception('Google Maps API key appears to be truncated');
-    }
-
-    // Security warning for development
+    } // Security warning for development
     if (Environment.isDevelopment &&
         mapsKey == 'AIzaSyDY6Xx10omIllIivBo4TOiegLMRvm2E7Xs') {
-      print('⚠️  WARNING: Using example/default API key in development');
+      // Debug logging disabled in production
     }
   }
 

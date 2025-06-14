@@ -288,10 +288,8 @@ class BookingService {
       }
 
       await batch.commit();
-
       if (expiredSpotIds.isNotEmpty) {
-        print(
-            'BookingService: Marked ${expiredSpotIds.length} expired bookings and made spots available');
+        // Debug logging disabled in production
       }
     } catch (e) {
       throw Exception('Failed to mark expired bookings: $e');
@@ -303,7 +301,7 @@ class BookingService {
     try {
       await markExpiredBookings();
     } catch (e) {
-      print('Error checking expired bookings: $e');
+      // Debug logging disabled in production
     }
   }
 

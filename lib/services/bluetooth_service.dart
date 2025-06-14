@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/error_handler.dart';
 
 /// Enum for different types of Bluetooth settings
@@ -179,12 +179,16 @@ class BluetoothService {
   /// Connect to a specific Bluetooth device with enhanced error handling
   static Future<bool> connectToDevice(BluetoothDevice device) async {
     try {
-      print(
-          '🔵 Bluetooth: Attempting to connect to ${device.name} (${device.address})');
+      if (kDebugMode) {
+        debugPrint(
+            'Bluetooth: Attempting to connect to ${device.name} (${device.address})');
+      }
 
       // Disconnect from any existing connection
       if (_isConnected) {
-        print('🔵 Bluetooth: Disconnecting from previous device');
+        if (kDebugMode) {
+          debugPrint('Bluetooth: Disconnecting from previous device');
+        }
         await disconnect();
         await Future.delayed(
             Duration(milliseconds: 500)); // Give time for cleanup
@@ -196,7 +200,8 @@ class BluetoothService {
           pairedDevices.any((d) => d.address == device.address);
 
       if (!isDevicePaired) {
-        print('🔴 Bluetooth: Device ${device.name} is not paired');
+        ErrorHandler.logError('BluetoothService.connectToDevice',
+            'Device ${device.name} is not paired');
         return false;
       }
 
@@ -204,11 +209,14 @@ class BluetoothService {
       bool? isBluetoothEnabled =
           await FlutterBluetoothSerial.instance.isEnabled;
       if (isBluetoothEnabled != true) {
-        print('🔴 Bluetooth: Bluetooth is not enabled');
+        ErrorHandler.logError(
+            'BluetoothService.connectToDevice', 'Bluetooth is not enabled');
         return false;
       }
 
-      print('🔵 Bluetooth: Creating connection to ${device.address}');
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Creating connection to ${device.address}');
+      }
 
       // Create connection with timeout and retry logic
       BluetoothConnection? connection;
@@ -217,28 +225,36 @@ class BluetoothService {
 
       while (retryCount < maxRetries && connection == null) {
         try {
-          print(
-              '🔵 Bluetooth: Connection attempt ${retryCount + 1}/$maxRetries');
+          if (kDebugMode) {
+            debugPrint(
+                'Bluetooth: Connection attempt ${retryCount + 1}/$maxRetries');
+          }
 
           // Add timeout to prevent hanging
           connection = await BluetoothConnection.toAddress(device.address)
               .timeout(Duration(seconds: 10));
 
-          print('🔵 Bluetooth: Connection established successfully');
+          if (kDebugMode) {
+            debugPrint('Bluetooth: Connection established successfully');
+          }
           break;
         } catch (e) {
           retryCount++;
-          print('🔴 Bluetooth: Connection attempt $retryCount failed: $e');
+          ErrorHandler.logError('BluetoothService.connectToDevice',
+              'Connection attempt $retryCount failed: $e');
 
           if (retryCount < maxRetries) {
-            print('🔵 Bluetooth: Waiting before retry...');
+            if (kDebugMode) {
+              debugPrint('Bluetooth: Waiting before retry...');
+            }
             await Future.delayed(Duration(seconds: 2));
           }
         }
       }
 
       if (connection == null) {
-        print('🔴 Bluetooth: Failed to connect after $maxRetries attempts');
+        ErrorHandler.logError('BluetoothService.connectToDevice',
+            'Failed to connect after $maxRetries attempts');
         return false;
       }
       _connection = connection;
@@ -248,20 +264,22 @@ class BluetoothService {
       // Initialize broadcast stream for messages
       _initializeMessageStream();
 
-      print(
-          '🟢 Bluetooth: Successfully connected to ${device.name} (${device.address})');
+      if (kDebugMode) {
+        debugPrint(
+            'Bluetooth: Successfully connected to ${device.name} (${device.address})');
+      }
 
       // Test the connection by trying to send a ping
       bool pingSuccess = await _testConnection();
       if (!pingSuccess) {
-        print('🔴 Bluetooth: Connection test failed, disconnecting');
+        ErrorHandler.logError('BluetoothService.connectToDevice',
+            'Connection test failed, disconnecting');
         await disconnect();
         return false;
       }
 
       return true;
     } catch (e) {
-      print('🔴 Bluetooth: Connection error: $e');
       ErrorHandler.logError('BluetoothService.connectToDevice', e);
       _isConnected = false;
       _connectedDeviceAddress = null;
@@ -272,12 +290,16 @@ class BluetoothService {
   /// Connect to device with terminal-friendly approach (for testing with serial apps)
   static Future<bool> connectToDeviceForTerminal(BluetoothDevice device) async {
     try {
-      print(
-          '🔵 Bluetooth: Attempting TERMINAL connection to ${device.name} (${device.address})');
+      if (kDebugMode) {
+        debugPrint(
+            'Bluetooth: Attempting TERMINAL connection to ${device.name} (${device.address})');
+      }
 
       // Disconnect from any existing connection
       if (_isConnected) {
-        print('🔵 Bluetooth: Disconnecting from previous device');
+        if (kDebugMode) {
+          debugPrint('Bluetooth: Disconnecting from previous device');
+        }
         await disconnect();
         await Future.delayed(
             Duration(milliseconds: 1000)); // Longer delay for terminal apps
@@ -289,7 +311,8 @@ class BluetoothService {
           pairedDevices.any((d) => d.address == device.address);
 
       if (!isDevicePaired) {
-        print('🔴 Bluetooth: Device ${device.name} is not paired');
+        ErrorHandler.logError('BluetoothService.connectToDeviceForTerminal',
+            'Device ${device.name} is not paired');
         return false;
       }
 
@@ -297,25 +320,35 @@ class BluetoothService {
       bool? isBluetoothEnabled =
           await FlutterBluetoothSerial.instance.isEnabled;
       if (isBluetoothEnabled != true) {
-        print('🔴 Bluetooth: Bluetooth is not enabled');
+        ErrorHandler.logError('BluetoothService.connectToDeviceForTerminal',
+            'Bluetooth is not enabled');
         return false;
       }
 
-      print('🔵 Bluetooth: Creating TERMINAL connection to ${device.address}');
+      if (kDebugMode) {
+        debugPrint(
+            'Bluetooth: Creating TERMINAL connection to ${device.address}');
+      }
 
       // Create connection with single attempt and longer timeout for terminal apps
       BluetoothConnection? connection;
 
       try {
-        print('🔵 Bluetooth: Attempting connection with 15-second timeout...');
+        if (kDebugMode) {
+          debugPrint(
+              'Bluetooth: Attempting connection with 15-second timeout...');
+        }
 
         // Longer timeout for terminal apps which might take time to accept connection
         connection = await BluetoothConnection.toAddress(device.address)
             .timeout(Duration(seconds: 15));
 
-        print('🔵 Bluetooth: Connection established successfully');
+        if (kDebugMode) {
+          debugPrint('Bluetooth: Connection established successfully');
+        }
       } catch (e) {
-        print('🔴 Bluetooth: Connection failed: $e');
+        ErrorHandler.logError('BluetoothService.connectToDeviceForTerminal',
+            'Connection failed: $e');
         return false;
       }
       _connection = connection;
@@ -325,23 +358,27 @@ class BluetoothService {
       // Initialize broadcast stream for messages
       _initializeMessageStream();
 
-      print(
-          '🟢 Bluetooth: Successfully connected to ${device.name} (${device.address})');
+      if (kDebugMode) {
+        debugPrint(
+            'Bluetooth: Successfully connected to ${device.name} (${device.address})');
+      }
 
       // For terminal testing, skip the AT command test and just verify the connection is stable
       await Future.delayed(Duration(milliseconds: 1000));
 
       if (_connection != null && _isConnected) {
-        print(
-            '🟢 Bluetooth: Connection verified stable for terminal communication');
+        if (kDebugMode) {
+          debugPrint(
+              'Bluetooth: Connection verified stable for terminal communication');
+        }
         return true;
       } else {
-        print('🔴 Bluetooth: Connection became unstable');
+        ErrorHandler.logError('BluetoothService.connectToDeviceForTerminal',
+            'Connection became unstable');
         await disconnect();
         return false;
       }
     } catch (e) {
-      print('🔴 Bluetooth: Terminal connection error: $e');
       ErrorHandler.logError('BluetoothService.connectToDeviceForTerminal', e);
       _isConnected = false;
       _connectedDeviceAddress = null;
@@ -356,7 +393,9 @@ class BluetoothService {
     }
 
     try {
-      print('🔵 Bluetooth: Testing connection...');
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Testing connection...');
+      }
 
       // For serial terminal apps, we'll just test if we can write to the stream
       // without expecting a specific response
@@ -368,10 +407,13 @@ class BluetoothService {
       // Add a small delay to see if the connection stays stable
       await Future.delayed(Duration(milliseconds: 500));
 
-      print('🔵 Bluetooth: Test message sent successfully');
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Test message sent successfully');
+      }
       return true;
     } catch (e) {
-      print('🔴 Bluetooth: Connection test failed: $e');
+      ErrorHandler.logError(
+          'BluetoothService._testConnection', 'Connection test failed: $e');
       return false;
     }
   }
@@ -390,7 +432,6 @@ class BluetoothService {
       final messageBytes = Uint8List.fromList(utf8.encode(message));
       _connection!.output.add(messageBytes);
       await _connection!.output.allSent;
-
       ErrorHandler.logError(
         'BluetoothService.sendMessage',
         'Message sent: "$message"',
@@ -406,19 +447,26 @@ class BluetoothService {
   /// Enhanced send message with logging for testing
   static Future<bool> sendMessageWithLogging(String message) async {
     if (!_isConnected || _connection == null) {
-      print('🔵 Bluetooth: Not connected to device');
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Not connected to device');
+      }
       return false;
     }
 
     try {
-      print('🔵 Bluetooth: Sending message: "$message"');
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Sending message: "$message"');
+      }
       final messageBytes = Uint8List.fromList(utf8.encode(message));
       _connection!.output.add(messageBytes);
       await _connection!.output.allSent;
-      print('🔵 Bluetooth: Message sent successfully');
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Message sent successfully');
+      }
       return true;
     } catch (e) {
-      print('🔴 Bluetooth: Error sending message: $e');
+      ErrorHandler.logError('BluetoothService.sendMessageWithLogging',
+          'Error sending message: $e');
       return false;
     }
   }
@@ -426,24 +474,28 @@ class BluetoothService {
   /// Send a terminal-friendly message (with proper line endings for serial apps)
   static Future<bool> sendTerminalMessage(String message) async {
     if (!_isConnected || _connection == null) {
-      print('🔴 Bluetooth: Not connected to device');
+      ErrorHandler.logError(
+          'BluetoothService.sendTerminalMessage', 'Not connected to device');
       return false;
     }
 
     try {
       // Add proper line ending for terminal apps
-      String terminalMessage =
-          message.endsWith('\n') ? message : message + '\n';
-      print('🔵 Bluetooth: Sending terminal message: "$terminalMessage"');
+      String terminalMessage = message.endsWith('\n') ? message : '$message\n';
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Sending terminal message: "$terminalMessage"');
+      }
 
       final messageBytes = Uint8List.fromList(utf8.encode(terminalMessage));
       _connection!.output.add(messageBytes);
       await _connection!.output.allSent;
 
-      print('🟢 Bluetooth: Terminal message sent successfully');
+      if (kDebugMode) {
+        debugPrint('Bluetooth: Terminal message sent successfully');
+      }
       return true;
     } catch (e) {
-      print('🔴 Bluetooth: Error sending terminal message: $e');
+      ErrorHandler.logError('BluetoothService.sendTerminalMessage', e);
       return false;
     }
   }
@@ -451,7 +503,8 @@ class BluetoothService {
   /// Send multiple test messages to verify terminal communication
   static Future<void> sendTestSequence() async {
     if (!_isConnected || _connection == null) {
-      print('🔴 Bluetooth: Not connected - cannot send test sequence');
+      ErrorHandler.logError('BluetoothService.sendTestSequence',
+          'Not connected - cannot send test sequence');
       return;
     }
 
@@ -464,7 +517,9 @@ class BluetoothService {
       "Test sequence complete."
     ];
 
-    print('🔵 Bluetooth: Starting test message sequence...');
+    if (kDebugMode) {
+      debugPrint('Bluetooth: Starting test message sequence...');
+    }
 
     for (int i = 0; i < testMessages.length; i++) {
       await sendTerminalMessage("[$i] ${testMessages[i]}");
@@ -472,7 +527,9 @@ class BluetoothService {
           Duration(milliseconds: 500)); // Delay between messages
     }
 
-    print('🟢 Bluetooth: Test sequence completed');
+    if (kDebugMode) {
+      debugPrint('Bluetooth: Test sequence completed');
+    }
   }
 
   /// Initialize message stream for broadcast listening
@@ -482,22 +539,26 @@ class BluetoothService {
     _messageController?.close();
 
     // Create new broadcast stream controller
-    _messageController = StreamController<String>.broadcast();
-
-    // Listen to the single-subscription input stream and broadcast messages
+    _messageController = StreamController<
+        String>.broadcast(); // Listen to the single-subscription input stream and broadcast messages
     if (_connection?.input != null) {
       _inputSubscription = _connection!.input!.listen(
         (data) {
           final message = utf8.decode(data);
-          print('🔵 Bluetooth: Received message: "$message"');
+          if (kDebugMode) {
+            debugPrint('Bluetooth: Received message: "$message"');
+          }
           _messageController?.add(message);
         },
         onError: (error) {
-          print('🔴 Bluetooth: Input stream error: $error');
+          ErrorHandler.logError('BluetoothService._initializeMessageStream',
+              'Input stream error: $error');
           _messageController?.addError(error);
         },
         onDone: () {
-          print('🔵 Bluetooth: Input stream closed');
+          if (kDebugMode) {
+            debugPrint('Bluetooth: Input stream closed');
+          }
           _messageController?.close();
         },
       );
@@ -516,7 +577,8 @@ class BluetoothService {
   /// Enhanced listener with logging for testing
   static Stream<String> listenForMessagesWithLogging() {
     if (!_isConnected || _messageController == null) {
-      print('🔴 Bluetooth: Not connected - cannot listen for messages');
+      ErrorHandler.logError('BluetoothService.listenForMessagesWithLogging',
+          'Not connected - cannot listen for messages');
       return Stream.empty();
     }
 
@@ -526,8 +588,10 @@ class BluetoothService {
   /// Disconnect from the current device with enhanced cleanup
   static Future<void> disconnect() async {
     try {
-      print(
-          '🔵 Bluetooth: Disconnecting from device: $_connectedDeviceAddress');
+      if (kDebugMode) {
+        debugPrint(
+            'Bluetooth: Disconnecting from device: $_connectedDeviceAddress');
+      }
 
       // Clean up message stream first
       _inputSubscription?.cancel();
@@ -540,21 +604,24 @@ class BluetoothService {
         try {
           await _connection!.output.close();
         } catch (e) {
-          print('🔴 Bluetooth: Error closing output stream: $e');
+          ErrorHandler.logError(
+              'BluetoothService.disconnect', 'Error closing output stream: $e');
         }
 
         // Dispose connection
         try {
           _connection!.dispose();
         } catch (e) {
-          print('🔴 Bluetooth: Error disposing connection: $e');
+          ErrorHandler.logError(
+              'BluetoothService.disconnect', 'Error disposing connection: $e');
         }
 
-        print(
-            '🟢 Bluetooth: Successfully disconnected from: $_connectedDeviceAddress');
+        if (kDebugMode) {
+          debugPrint(
+              'Bluetooth: Successfully disconnected from: $_connectedDeviceAddress');
+        }
       }
     } catch (e) {
-      print('🔴 Bluetooth: Error during disconnect: $e');
       ErrorHandler.logError('BluetoothService.disconnect', e);
     } finally {
       _connection = null;
@@ -591,13 +658,16 @@ class BluetoothService {
   static Future<void> testBluetoothConnection() async {
     try {
       final pairedDevices = await getPairedDevices();
-      print('🔵 Bluetooth Test: Found ${pairedDevices.length} paired devices:');
-
-      for (var device in pairedDevices) {
-        print('🔵 Device: ${device.name ?? 'Unknown'} - ${device.address}');
+      if (kDebugMode) {
+        debugPrint(
+            'Bluetooth Test: Found ${pairedDevices.length} paired devices:');
+        for (var device in pairedDevices) {
+          debugPrint('Device: ${device.name ?? 'Unknown'} - ${device.address}');
+        }
       }
     } catch (e) {
-      print('🔴 Bluetooth Test: Error getting paired devices: $e');
+      ErrorHandler.logError('BluetoothService.testBluetoothConnection',
+          'Error getting paired devices: $e');
     }
   }
 
@@ -692,30 +762,32 @@ class BluetoothService {
 
   /// Print formatted diagnosis report
   static Future<void> printDiagnosisReport() async {
-    print('\n🔵 ===== BLUETOOTH DIAGNOSIS REPORT =====');
+    if (!kDebugMode) return; // Only run in debug mode
+
+    debugPrint('\n===== BLUETOOTH DIAGNOSIS REPORT =====');
 
     Map<String, dynamic> diagnosis = await diagnoseBluetooth();
 
-    print('🔵 Bluetooth Enabled: ${diagnosis['bluetoothEnabled']}');
-    print('🔵 Paired Devices: ${diagnosis['pairedDevicesCount']}');
-    print('🔵 HC-05 Devices Found: ${diagnosis['hc05DevicesFound']}');
-    print('🔵 Permissions Granted: ${diagnosis['permissionsGranted']}');
-    print('🔵 Connection Status: ${diagnosis['connectionStatus']}');
+    debugPrint('Bluetooth Enabled: ${diagnosis['bluetoothEnabled']}');
+    debugPrint('Paired Devices: ${diagnosis['pairedDevicesCount']}');
+    debugPrint('HC-05 Devices Found: ${diagnosis['hc05DevicesFound']}');
+    debugPrint('Permissions Granted: ${diagnosis['permissionsGranted']}');
+    debugPrint('Connection Status: ${diagnosis['connectionStatus']}');
 
     if (diagnosis['errors'].isNotEmpty) {
-      print('\n🔴 ERRORS:');
+      debugPrint('\nERRORS:');
       for (String error in diagnosis['errors']) {
-        print('🔴 - $error');
+        debugPrint('- $error');
       }
     }
 
     if (diagnosis['recommendations'].isNotEmpty) {
-      print('\n💡 RECOMMENDATIONS:');
+      debugPrint('\nRECOMMENDATIONS:');
       for (String recommendation in diagnosis['recommendations']) {
-        print('💡 - $recommendation');
+        debugPrint('- $recommendation');
       }
     }
 
-    print('🔵 =====================================\n');
+    debugPrint('=====================================\n');
   }
 }

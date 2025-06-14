@@ -5,7 +5,7 @@ import '../utils/snackbar_utils.dart';
 import '../utils/app_constants.dart';
 import '../widgets/common_widgets.dart';
 
-/// Centralized error handling service for the parking manager application
+/// Centralized error handling service for the IoT parking application
 /// Provides consistent error handling, user feedback, and error logging
 class ErrorService {
   /// Handle Firebase authentication errors with user feedback

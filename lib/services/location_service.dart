@@ -5,50 +5,49 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class LocationService {
   static Future<Position?> getCurrentLocation() async {
     try {
-      print('LocationService: Starting location request...');
+      // Debug logging disabled in production
 
       // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      print('LocationService: Location services enabled: $serviceEnabled');
+      // Debug logging disabled in production
       if (!serviceEnabled) {
-        print('Location services are disabled.');
+        // Debug logging disabled in production
         return null;
       }
 
       // Check location permission
       LocationPermission permission = await Geolocator.checkPermission();
-      print('LocationService: Current permission status: $permission');
+      // Debug logging disabled in production
 
       if (permission == LocationPermission.denied) {
-        print('LocationService: Requesting location permission...');
+        // Debug logging disabled in production
         permission = await Geolocator.requestPermission();
-        print('LocationService: Permission after request: $permission');
+        // Debug logging disabled in production
         if (permission == LocationPermission.denied) {
-          print('Location permissions are denied');
+          // Debug logging disabled in production
           return null;
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        print(
-            'Location permissions are permanently denied, we cannot request permissions.');
+        // Debug logging disabled in production
         // For permanently denied permissions, we could open app settings
         return null;
       }
 
-      print('LocationService: Getting current position...');
+      // Debug logging disabled in production
       // Get current position with better accuracy settings
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 15), // Increased timeout
       );
 
-      print('Location obtained: ${position.latitude}, ${position.longitude}');
+      // Debug logging disabled in production
       return position;
     } catch (e) {
-      print('Error getting location: $e');
+      // Debug logging disabled in production
       // Check if this is a specific geolocator error
       if (e.toString().contains('No location permissions')) {
-        print('LocationService: Permissions issue detected');
+        // Debug logging disabled in production
       }
       return null;
     }
@@ -66,12 +65,12 @@ class LocationService {
             ),
           ),
         );
-        print('Camera moved to user location');
+        // Debug logging disabled in production
       } else {
-        print('Could not get user location to move camera');
+        // Debug logging disabled in production
       }
     } catch (e) {
-      print('Error moving camera to user location: $e');
+      // Debug logging disabled in production
     }
   }
 }

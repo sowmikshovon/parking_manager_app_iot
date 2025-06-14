@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines how API keys are secured in the Parking Manager IoT app.
+This document outlines how API keys are secured in the IoT Parking app.
 
 ## ⚠️ IMPORTANT: Before Production Deployment
 

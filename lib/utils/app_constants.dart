@@ -71,7 +71,7 @@ class AppColors {
 /// Application text strings
 class AppStrings {
   // App info
-  static const String appTitle = 'Parking Manager';
+  static const String appTitle = 'IoT Parking';
 
   // Authentication
   static const String login = 'Login';
@@ -258,7 +258,7 @@ class AppStrings {
   static const String mustBeLoggedInToBook =
       'You must be logged in to book a parking spot.';
   // Drawer and navigation labels
-  static const String parkingManagerTitle = 'Parking Manager';
+  static const String parkingManagerTitle = 'IoT Parking';
   // Authentication and booking messages
   static const String parkingSpotNoLongerAvailable2 =
       'This parking spot is no longer available.';

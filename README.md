@@ -1,4 +1,4 @@
-# Parking Manager App with IoT Integration
+# IoT Parking App
 
 A comprehensive Flutter application for parking spot management with IoT device integration via Bluetooth communication.
 

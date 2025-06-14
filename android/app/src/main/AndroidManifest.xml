@@ -19,7 +19,7 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
     
     <uses-feature android:name="android.hardware.camera" android:required="false"/>    <application
-        android:label="parking_manager_app_iot"
+        android:label="IoT Parking"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">        <activity

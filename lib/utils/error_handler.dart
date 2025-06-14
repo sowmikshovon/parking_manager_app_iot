@@ -1,11 +1,10 @@
-/// Error handling utilities for the parking manager application
+/// Error handling utilities for the IoT parking application
 /// Provides standardized error handling, logging, and user-friendly error messages
 library;
 
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:async';
 import 'app_constants.dart';
 
 /// Custom exception classes for better error categorization

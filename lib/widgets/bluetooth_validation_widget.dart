@@ -4,7 +4,7 @@ import '../services/bluetooth_service.dart';
 
 /// Quick validation widget to test enhanced Bluetooth functionality
 class BluetoothValidationWidget extends StatefulWidget {
-  const BluetoothValidationWidget({Key? key}) : super(key: key);
+  const BluetoothValidationWidget({super.key});
 
   @override
   State<BluetoothValidationWidget> createState() =>

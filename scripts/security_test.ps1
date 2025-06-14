@@ -1,4 +1,4 @@
-# Security Test Script for Parking Manager IoT App
+# Security Test Script for IoT Parking App
 # This script verifies that API keys are properly secured
 
 Write-Host "🔐 Running Security Tests..." -ForegroundColor Green

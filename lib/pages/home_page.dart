@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/expired_spot_tracker.dart';
@@ -61,7 +62,9 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       // Silent failure - don't interrupt user experience
-      print('Error checking completed parking sessions: $e');
+      if (kDebugMode) {
+        debugPrint('Error checking completed parking sessions: $e');
+      }
     }
   }
 

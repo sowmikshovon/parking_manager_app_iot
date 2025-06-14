@@ -20,7 +20,7 @@ class UserService {
         if (name.isNotEmpty) return name;
       }
     } catch (e) {
-      print('Error getting user name: $e');
+      // Debug logging disabled in production
     }
 
     if (user.displayName?.isNotEmpty == true) {
@@ -42,7 +42,7 @@ class UserService {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       return userDoc.exists ? userDoc.data() : null;
     } catch (e) {
-      print('Error getting user data: $e');
+      // Debug logging disabled in production
       return null;
     }
   }
