@@ -1,6 +1,6 @@
 # IoT Parking App
 
-A comprehensive Flutter application for parking spot management with IoT device integration via Bluetooth communication.
+A comprehensive Flutter application for parking spot management with IoT device integration via Bluetooth communication. Created for an academic project defence.
 
 ## 🚗 Features
 
