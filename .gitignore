@@ -48,6 +48,13 @@ app.*.map.json
 android/local.properties
 **/local.properties
 
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.staging
+**/.env
+
 # Firebase configuration (optional - uncomment if you want to secure these too)
 # android/app/google-services.json
 # lib/firebase_options.dart

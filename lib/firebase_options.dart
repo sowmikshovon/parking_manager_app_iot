@@ -41,7 +41,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC8gaXsLHoNQi29fuiJm_vrJg5GzMPQeA8',
+    apiKey: String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: ''),
     appId: '1:916876344507:web:75e638cd53fc998c5b3d9e',
     messagingSenderId: '916876344507',
     projectId: 'parking-manager-app-iot',
@@ -50,7 +50,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDEcOKMoqUMkmxEG3Gmh49HlaZ7MYBLoJU',
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY', defaultValue: ''),
     appId: '1:916876344507:android:f5becd2f5e9b15d05b3d9e',
     messagingSenderId: '916876344507',
     projectId: 'parking-manager-app-iot',
@@ -58,7 +58,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyButikL92IQbjbICrRFzVCIVOsba524IHo',
+    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY', defaultValue: ''),
     appId: '1:916876344507:ios:01506d8dc697ac2d5b3d9e',
     messagingSenderId: '916876344507',
     projectId: 'parking-manager-app-iot',
@@ -67,7 +67,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyButikL92IQbjbICrRFzVCIVOsba524IHo',
+    apiKey: String.fromEnvironment('FIREBASE_MACOS_API_KEY', defaultValue: ''),
     appId: '1:916876344507:ios:01506d8dc697ac2d5b3d9e',
     messagingSenderId: '916876344507',
     projectId: 'parking-manager-app-iot',
@@ -76,7 +76,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyC8gaXsLHoNQi29fuiJm_vrJg5GzMPQeA8',
+    apiKey: String.fromEnvironment('FIREBASE_WINDOWS_API_KEY', defaultValue: ''),
     appId: '1:916876344507:web:6a5e14b31b303a115b3d9e',
     messagingSenderId: '916876344507',
     projectId: 'parking-manager-app-iot',

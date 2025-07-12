@@ -7,11 +7,10 @@ class Environment {
     defaultValue: '', // Empty for security - will be populated at build time
   );
 
-  // Firebase API Key - can be used if you want to secure Firebase keys too
+  // Firebase API Key - secured via environment variables
   static const String firebaseApiKey = String.fromEnvironment(
     'FIREBASE_API_KEY',
-    defaultValue:
-        'AIzaSyDEcOKMoqUMkmxEG3Gmh49HlaZ7MYBLoJU', // Current key as fallback
+    defaultValue: '', // Empty for security - will be set via environment
   );
 
   // Build environment detection

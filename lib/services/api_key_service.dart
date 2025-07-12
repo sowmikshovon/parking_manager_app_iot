@@ -41,10 +41,11 @@ class ApiKeyService {
 
     if (mapsKey.length < 35) {
       throw Exception('Google Maps API key appears to be truncated');
-    } // Security warning for development
-    if (Environment.isDevelopment &&
-        mapsKey == 'AIzaSyDY6Xx10omIllIivBo4TOiegLMRvm2E7Xs') {
-      // Debug logging disabled in production
+    }
+
+    // Security warning for development - check if using default/example key
+    if (Environment.isDevelopment && mapsKey.contains('REPLACE_WITH_YOUR_KEY')) {
+      throw Exception('Please replace the placeholder API key with your actual Google Maps API key');
     }
   }
 
